@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: mss301-digital-library
+    environment: ${ENVIRONMENT:-prod}
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: spring-boot-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          # Replace APP_VM_IP with the internal IP of the VM running the
+          # Spring Boot services (e.g. 10.128.0.5). Use the GCP internal IP
+          # so traffic stays inside the VPC — never the external IP.
+          - APP_VM_IP:8761    # eureka-server
+          - APP_VM_IP:8080    # api-gateway
+          - APP_VM_IP:8081    # notification-service
+          - APP_VM_IP:8082    # fine-service

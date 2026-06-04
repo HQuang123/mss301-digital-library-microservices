@@ -1,0 +1,1 @@
+Notification for both email and in-app

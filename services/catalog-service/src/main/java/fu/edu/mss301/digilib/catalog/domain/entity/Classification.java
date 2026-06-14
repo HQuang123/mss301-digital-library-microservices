@@ -2,14 +2,14 @@ package fu.edu.mss301.digilib.catalog.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 
-@Getter
-@Setter
+@Getter @Setter
 @Entity
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor @AllArgsConstructor
 @Builder
 @Table(name = "classifications")
+@SQLRestriction("is_deleted = false")
 public class Classification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,4 +24,9 @@ public class Classification {
 
     @Column(name = "classification_code", nullable = false)
     private Integer classificationCode;
+
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
 }

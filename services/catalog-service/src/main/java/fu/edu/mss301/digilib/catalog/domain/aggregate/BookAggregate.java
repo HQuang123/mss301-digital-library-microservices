@@ -9,19 +9,21 @@ import fu.edu.mss301.digilib.catalog.domain.entity.DigitalResource;
 import fu.edu.mss301.digilib.catalog.domain.vo.BookContent;
 import fu.edu.mss301.digilib.catalog.domain.vo.Isbn;
 import fu.edu.mss301.digilib.catalog.domain.vo.PublicationInfo;
-import lombok.Getter;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-@Getter
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class BookAggregate {
 
-    private final Book book;
+    private Book book;
 
-    private final Isbn isbn;
+    private Isbn isbn;
 
     private PublicationInfo publicationInfo;
 
@@ -33,7 +35,7 @@ public class BookAggregate {
 
     private final List<BookAuditLog> auditLogs = new ArrayList<>();
 
-    public BookAggregate(
+    public static BookAggregate create(
             Isbn isbn,
             String title,
             String author,
@@ -45,12 +47,14 @@ public class BookAggregate {
     ) {
         validateTitle(title);
         validateAuthor(author);
+        validateBookDetails(isbn, publicationInfo, bookContent, category, classification);
 
-        this.isbn = isbn;
-        this.publicationInfo = publicationInfo;
-        this.bookContent = bookContent;
+        BookAggregate aggregate = new BookAggregate();
+        aggregate.isbn = isbn;
+        aggregate.publicationInfo = publicationInfo;
+        aggregate.bookContent = bookContent;
 
-        this.book = Book.builder()
+        aggregate.book = Book.builder()
                 .isbn(isbn.getValue())
                 .title(title)
                 .author(author)
@@ -60,12 +64,39 @@ public class BookAggregate {
                 .language(publicationInfo.getLanguage())
                 .description(bookContent.getDescription())
                 .coverImageUrl(bookContent.getCoverImageUrl())
-                .availabilityStatus("AVAILABLE")
+                .bookStatus(Book.BookStatus.ACTIVE)
                 .category(category)
                 .classification(classification)
                 .build();
 
-        addAuditLog(BookAuditLog.AuditAction.CREATE, userId);
+        aggregate.addAuditLog(BookAuditLog.AuditAction.CREATE, userId);
+        return aggregate;
+    }
+
+    public static BookAggregate rehydrate(
+            Book book,
+            List<BookCopy> bookCopies,
+            List<DigitalResource> digitalResources,
+            List<BookAuditLog> auditLogs
+    ) {
+        if (book == null) {
+            throw new IllegalArgumentException("Book cannot be null");
+        }
+
+        BookAggregate aggregate = new BookAggregate();
+        aggregate.book = book;
+        aggregate.isbn = new Isbn(book.getIsbn());
+        aggregate.publicationInfo = new PublicationInfo(
+                book.getPublisher(),
+                book.getPublicationYear(),
+                book.getEdition(),
+                book.getLanguage()
+        );
+        aggregate.bookContent = new BookContent(book.getDescription(), book.getCoverImageUrl());
+        aggregate.bookCopies.addAll(bookCopies);
+        aggregate.digitalResources.addAll(digitalResources);
+        aggregate.auditLogs.addAll(auditLogs);
+        return aggregate;
     }
 
     public void updateBookInformation(
@@ -79,6 +110,7 @@ public class BookAggregate {
     ) {
         validateTitle(title);
         validateAuthor(author);
+        validateBookDetails(isbn, publicationInfo, bookContent, category, classification);
 
         this.publicationInfo = publicationInfo;
         this.bookContent = bookContent;
@@ -97,81 +129,104 @@ public class BookAggregate {
         addAuditLog(BookAuditLog.AuditAction.UPDATE, userId);
     }
 
+    public void assignCategory(Category category, Integer userId) {
+        if (category == null) {
+            throw new IllegalArgumentException("Category cannot be null");
+        }
+
+        book.setCategory(category);
+        addAuditLog(BookAuditLog.AuditAction.UPDATE, userId);
+    }
+
+    public void assignClassification(Classification classification, Integer userId) {
+        if (classification == null) {
+            throw new IllegalArgumentException("Classification cannot be null");
+        }
+
+        book.setClassification(classification);
+        addAuditLog(BookAuditLog.AuditAction.UPDATE, userId);
+    }
+
+    public void updateBookAvailabilityStatus(String availabilityStatus, Integer userId) {
+        Book.BookStatus bookStatus = parseBookStatus(availabilityStatus);
+        book.setBookStatus(bookStatus);
+        addAuditLog(BookAuditLog.AuditAction.UPDATE, userId);
+    }
+
+    public void deleteBook(Integer userId) {
+        book.setBookStatus(Book.BookStatus.ARCHIVED);
+        book.setIsDeleted(true);
+        addAuditLog(BookAuditLog.AuditAction.DELETE, userId);
+    }
+
     public void addBookCopy(
             String barcode,
             String shelfLocation,
-            LocalDate acquisitionDate
+            LocalDate acquisitionDate,
+            Integer userId
     ) {
-        if (barcode == null || barcode.trim().isEmpty()) {
-            throw new IllegalArgumentException("Barcode cannot be empty");
-        }
+        BookCopyManager.addBookCopy(this, barcode, shelfLocation, acquisitionDate, userId);
+    }
 
-        if (shelfLocation == null || shelfLocation.trim().isEmpty()) {
-            throw new IllegalArgumentException("Shelf location cannot be empty");
-        }
+    public void updateBookCopy(
+            Long copyId,
+            String barcode,
+            String shelfLocation,
+            LocalDate acquisitionDate,
+            BookCopy.CopyStatus copyStatus,
+            Integer userId
+    ) {
+        BookCopyManager.updateBookCopy(this, copyId, barcode, shelfLocation, acquisitionDate, copyStatus, userId);
+    }
 
-        if (acquisitionDate == null) {
-            throw new IllegalArgumentException("Acquisition date cannot be null");
-        }
+    public void removeBookCopy(Long copyId, Integer userId) {
+        BookCopyManager.removeBookCopy(this, copyId, userId);
+    }
 
-        BookCopy copy = BookCopy.builder()
-                .barcode(barcode)
-                .shelfLocation(shelfLocation)
-                .acquisitionDate(acquisitionDate)
-                .copyStatus(BookCopy.CopyStatus.AVAILABLE)
-                .book(book)
-                .build();
+    public void updateCopyShelfLocation(Long copyId, String shelfLocation, Integer userId) {
+        BookCopyManager.updateCopyShelfLocation(this, copyId, shelfLocation, userId);
+    }
 
-        bookCopies.add(copy);
-        updateBookAvailabilityStatus();
+    public void updateCopyStatus(Long copyId, BookCopy.CopyStatus copyStatus, Integer userId) {
+        BookCopyManager.updateCopyStatus(this, copyId, copyStatus, userId);
     }
 
     public void addDigitalResource(
             String fileFormat,
             String resourceUrl,
-            String accessPermission
+            String accessPermission,
+            Integer userId
     ) {
-        if (fileFormat == null || fileFormat.trim().isEmpty()) {
-            throw new IllegalArgumentException("File format cannot be empty");
-        }
-
-        if (resourceUrl == null || resourceUrl.trim().isEmpty()) {
-            throw new IllegalArgumentException("Resource URL cannot be empty");
-        }
-
-        if (accessPermission == null || accessPermission.trim().isEmpty()) {
-            throw new IllegalArgumentException("Access permission cannot be empty");
-        }
-
-        DigitalResource resource = DigitalResource.builder()
-                .fileFormat(fileFormat)
-                .resourceUrl(resourceUrl)
-                .accessPermission(accessPermission)
-                .book(book)
-                .build();
-
-        digitalResources.add(resource);
+        DigitalResourceManager.addDigitalResource(this, fileFormat, resourceUrl, accessPermission, userId);
     }
 
-    public void markCopyAsLoaned(Long copyId) {
-        BookCopy copy = findCopyById(copyId);
-        copy.setCopyStatus(BookCopy.CopyStatus.LOANED);
-        updateBookAvailabilityStatus();
+    public void updateDigitalResource(
+            Long resourceId,
+            String fileFormat,
+            String resourceUrl,
+            String accessPermission,
+            Integer userId
+    ) {
+        DigitalResourceManager.updateDigitalResource(this, resourceId, fileFormat, resourceUrl, accessPermission, userId);
     }
 
-    public void markCopyAsAvailable(Long copyId) {
-        BookCopy copy = findCopyById(copyId);
-        copy.setCopyStatus(BookCopy.CopyStatus.AVAILABLE);
-        updateBookAvailabilityStatus();
+    public void removeDigitalResource(Long resourceId, Integer userId) {
+        DigitalResourceManager.removeDigitalResource(this, resourceId, userId);
     }
 
-    public void markCopyAsOverdue(Long copyId) {
-        BookCopy copy = findCopyById(copyId);
-        copy.setCopyStatus(BookCopy.CopyStatus.OVERDUE);
-        updateBookAvailabilityStatus();
+    public void updateDigitalResourceAccessPermission(
+            Long resourceId,
+            String accessPermission,
+            Integer userId
+    ) {
+        DigitalResourceManager.updateDigitalResourceAccessPermission(this, resourceId, accessPermission, userId);
     }
 
-    public void addAuditLog(BookAuditLog.AuditAction action, Integer userId) {
+    public DigitalResource accessDigitalResource(Long resourceId, String requesterPermission) {
+        return DigitalResourceManager.accessDigitalResource(this, resourceId, requesterPermission);
+    }
+
+    void addAuditLog(BookAuditLog.AuditAction action, Integer userId) {
         if (action == null) {
             throw new IllegalArgumentException("Audit action cannot be null");
         }
@@ -200,29 +255,95 @@ public class BookAggregate {
                 .count();
     }
 
-    private void updateBookAvailabilityStatus() {
-        boolean hasAvailableCopy = bookCopies.stream()
-                .anyMatch(copy -> copy.getCopyStatus() == BookCopy.CopyStatus.AVAILABLE);
-
-        book.setAvailabilityStatus(hasAvailableCopy ? "AVAILABLE" : "BORROWED");
+    public Long getBookId() {
+        return book != null ? book.getBookId() : null;
     }
 
-    private BookCopy findCopyById(Long copyId) {
-        return bookCopies.stream()
-                .filter(copy -> copy.getCopyId() != null && copy.getCopyId().equals(copyId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Book copy not found"));
+    public Book getBook() {
+        return book;
     }
 
-    private void validateTitle(String title) {
+    public Isbn getIsbn() {
+        return isbn;
+    }
+
+    public PublicationInfo getPublicationInfo() {
+        return publicationInfo;
+    }
+
+    public BookContent getBookContent() {
+        return bookContent;
+    }
+
+    public List<BookCopy> getBookCopies() {
+        return Collections.unmodifiableList(bookCopies);
+    }
+
+    public List<DigitalResource> getDigitalResources() {
+        return Collections.unmodifiableList(digitalResources);
+    }
+
+    public List<BookAuditLog> getAuditLogs() {
+        return Collections.unmodifiableList(auditLogs);
+    }
+
+    List<BookCopy> mutableBookCopies() {
+        return bookCopies;
+    }
+
+    List<DigitalResource> mutableDigitalResources() {
+        return digitalResources;
+    }
+
+    private static void validateTitle(String title) {
         if (title == null || title.trim().isEmpty()) {
             throw new IllegalArgumentException("Book title cannot be empty");
         }
     }
 
-    private void validateAuthor(String author) {
+    private static void validateAuthor(String author) {
         if (author == null || author.trim().isEmpty()) {
             throw new IllegalArgumentException("Author cannot be empty");
+        }
+    }
+
+    private static Book.BookStatus parseBookStatus(String availabilityStatus) {
+        if (availabilityStatus == null || availabilityStatus.trim().isEmpty()) {
+            throw new IllegalArgumentException("Availability status cannot be empty");
+        }
+
+        try {
+            return Book.BookStatus.valueOf(availabilityStatus.trim().toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Invalid book status: " + availabilityStatus, exception);
+        }
+    }
+
+    private static void validateBookDetails(
+            Isbn isbn,
+            PublicationInfo publicationInfo,
+            BookContent bookContent,
+            Category category,
+            Classification classification
+    ) {
+        if (isbn == null) {
+            throw new IllegalArgumentException("ISBN cannot be null");
+        }
+
+        if (publicationInfo == null) {
+            throw new IllegalArgumentException("Publication info cannot be null");
+        }
+
+        if (bookContent == null) {
+            throw new IllegalArgumentException("Book content cannot be null");
+        }
+
+        if (category == null) {
+            throw new IllegalArgumentException("Category cannot be null");
+        }
+
+        if (classification == null) {
+            throw new IllegalArgumentException("Classification cannot be null");
         }
     }
 }

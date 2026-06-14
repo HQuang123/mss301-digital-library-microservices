@@ -3,16 +3,16 @@ package fu.edu.mss301.digilib.catalog.domain.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor
 @Builder
 @Entity
 @Table(name = "digital_resources")
+@SQLRestriction("is_deleted = false")
 public class DigitalResource {
 
     @Id
@@ -33,7 +33,12 @@ public class DigitalResource {
     @Column(name = "uploaded_at", updatable = false)
     private LocalDateTime uploadedAt;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "book_id", nullable = false)
     private Book book;
+
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
 }

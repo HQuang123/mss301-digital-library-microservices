@@ -2,14 +2,16 @@ package fu.edu.mss301.digilib.catalog.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 
-@Getter
-@Setter
+import java.util.UUID;
+
+@Getter @Setter
 @Entity
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor @AllArgsConstructor
 @Builder
 @Table(name = "categories")
+@SQLRestriction("is_deleted = false")
 public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -9,7 +9,7 @@ spring:
       server: 
         git: 
           uri: https://github.com/PhuNguyen12345/mss301-digital-library-microservices.git
-          default-label: main 
+          default-label: phu 
           search-paths: infra/config-repo
 
 eureka:

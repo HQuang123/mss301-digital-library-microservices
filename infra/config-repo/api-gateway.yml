@@ -24,7 +24,7 @@ spring:
                 retries: 3
                 statuses: GATEWAY_TIMEOUT
                 methods: GET
-                exceptions: java.util.concurrent.TimeoutException
+                exceptions: org.springframework.cloud.gateway.support.TimeoutException, io.netty.handler.timeout.ReadTimeoutException, java.util.concurrent.TimeoutException
                 backoff:
                   firstBackoff: 500ms
                   maxBackoff: 2000ms

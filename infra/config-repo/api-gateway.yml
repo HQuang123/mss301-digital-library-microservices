@@ -33,6 +33,12 @@ spring:
           predicates:
             - Path=/api/loan/**
             - Header=X-Client-Type,web
+
+        - id: member-service
+          uri: lb://MEMBER-SERVICE
+          predicates:
+            - Path=/api/members/**
+            - Header=X-Client-Type,web
   
 management:
   endpoint:

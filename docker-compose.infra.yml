@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: simpi
       POSTGRES_PASSWORD: "1231"
     ports:
-      - "5433:5432"
+      - "5436:5432"
     volumes:
       - keycloak_db_data:/var/lib/postgresql/data
     networks:
@@ -28,7 +28,7 @@ services:
       KC_DB_PASSWORD: "1231"
       KC_FEATURES: token-exchange
     ports:
-      - "8080:8080"
+      - "8180:8080"
     depends_on:
       - keycloak-db
     networks:

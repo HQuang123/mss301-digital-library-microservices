@@ -34,3 +34,10 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+
+resilience4j:
+  bulkhead:
+    instances:
+      catalogBulkhead:
+        maxConcurrentCalls: 1
+        maxWaitDuration: 0 # Không chờ đợi, đầy là ném ngoại lệ (fallback) luôn

@@ -19,7 +19,7 @@ public class FinePolicy {
     private Integer id;
 
     @Column(name = "daily_rate", nullable = false)
-    private Double dailyRate;
+    private Long dailyRate;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
@@ -28,7 +28,7 @@ public class FinePolicy {
     private Integer lostThresholdDays;
 
     @Column(name = "lost_penalty", nullable = false)
-    private Double lostPenalty;
+    private Long lostPenalty;
 
     @Column(name = "create_at", nullable = false, updatable = false)
     private LocalDateTime createAt;

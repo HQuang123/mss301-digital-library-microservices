@@ -67,8 +67,7 @@ public final class FineAggregate {
     public void markPaid(Fine fine) {
         Fine validFine = requirePolicyFine(fine);
 
-        validFine.setStatus(FineStatus.PAID);
-        validFine.setWaiverReason(null);
+        validFine.markPaid(LocalDateTime.now());
     }
 
     public void waive(Fine fine, String waiverReason) {
@@ -76,6 +75,7 @@ public final class FineAggregate {
         String validWaiverReason = requireText(waiverReason, "waiverReason");
 
         validFine.setStatus(FineStatus.WAIVED);
+        validFine.setPaidAt(null);
         validFine.setWaiverReason(validWaiverReason);
     }
 
@@ -83,7 +83,7 @@ public final class FineAggregate {
         return policy.getId();
     }
 
-    public Double getDailyRate() {
+    public Long getDailyRate() {
         return policy.getDailyRate();
     }
 
@@ -91,7 +91,7 @@ public final class FineAggregate {
         return policy.getLostThresholdDays();
     }
 
-    public Double getLostPenalty() {
+    public Long getLostPenalty() {
         return policy.getLostPenalty();
     }
 
@@ -99,12 +99,22 @@ public final class FineAggregate {
         return Boolean.TRUE.equals(policy.getIsActive());
     }
 
-    private Double calculateAmount(FineRange range) {
+    private Long calculateAmount(FineRange range) {
         long overdueDays = range.overdueDays();
-        double amount = overdueDays * policy.getDailyRate();
+        long amount;
+
+        try {
+            amount = Math.multiplyExact(overdueDays, policy.getDailyRate());
+        } catch (ArithmeticException exception) {
+            throw new IllegalStateException("calculated fine amount exceeds supported range", exception);
+        }
 
         if (range.isLost(policy.getLostThresholdDays())) {
-            amount += policy.getLostPenalty();
+            try {
+                amount = Math.addExact(amount, policy.getLostPenalty());
+            } catch (ArithmeticException exception) {
+                throw new IllegalStateException("calculated fine amount exceeds supported range", exception);
+            }
         }
 
         return amount;
@@ -160,7 +170,7 @@ public final class FineAggregate {
         return value;
     }
 
-    private static Double requireNonNegative(Double value, String fieldName) {
+    private static Long requireNonNegative(Long value, String fieldName) {
         if (value == null || value < 0) {
             throw new IllegalArgumentException(fieldName + " must not be negative");
         }

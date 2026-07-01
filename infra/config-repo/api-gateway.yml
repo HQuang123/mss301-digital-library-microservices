@@ -15,7 +15,7 @@ spring:
           uri: lb://CATALOG-SERVICE
           metadata:
             response-timeout: 2000 # Timeout thực tế 2s áp dụng ở cấp HTTP Client
-            connect-timeout: 500
+            connect-timeout: 1000
           predicates:
             - Path=/api/catalog/**
           filters:

@@ -35,6 +35,7 @@ class MemberProfileServiceTests {
                     assertThat(profile.getBorrowingLimit()).isEqualTo(5);
                     assertThat(profile.getLoanPeriodDays()).isEqualTo(14);
                     assertThat(profile.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+                    assertThat(profile.getStatus()).isEqualTo("UNLOCKED");
                     assertThat(profile.isNew()).isTrue();
                     assertThat(profile.getCreatedAt()).isNotNull();
                     assertThat(profile.getUpdatedAt()).isNotNull();
@@ -68,6 +69,23 @@ class MemberProfileServiceTests {
                     assertThat(profile.getEmail()).isEqualTo("reader@example.com");
                     assertThat(profile.getMemberCode()).isEqualTo("LIB-00000001");
                     assertThat(profile.getUpdatedAt()).isAfter(Instant.parse("2026-01-01T00:00:00Z"));
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void changeStatusUpdatesToUppercaseAndSaves() {
+        MemberProfile existing = MemberProfile.builder()
+                .id("member-1")
+                .status("UNLOCKED")
+                .build();
+
+        when(repository.findById("member-1")).thenReturn(Mono.just(existing));
+        when(repository.save(any(MemberProfile.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+
+        StepVerifier.create(service.changeStatus("member-1", "soft_locked"))
+                .assertNext(profile -> {
+                    assertThat(profile.getStatus()).isEqualTo("SOFT_LOCKED");
                 })
                 .verifyComplete();
     }

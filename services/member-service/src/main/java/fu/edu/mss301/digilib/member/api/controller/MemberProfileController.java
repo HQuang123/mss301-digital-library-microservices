@@ -1,6 +1,7 @@
 package fu.edu.mss301.digilib.member.api.controller;
 
 import fu.edu.mss301.digilib.member.api.dto.MemberResponse;
+import fu.edu.mss301.digilib.member.api.dto.MemberStatusRequest;
 import fu.edu.mss301.digilib.member.api.dto.MemberUpdateRequest;
 import fu.edu.mss301.digilib.member.domain.service.MemberProfileService;
 import jakarta.validation.Valid;
@@ -26,6 +27,18 @@ public class MemberProfileController {
     public Flux<MemberResponse> getAllMember() {
         return profileService.getAll()
                 .switchIfEmpty(Flux.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Member list is empty")))
+                .map(MemberResponse::from);
+    }
+
+    @PutMapping("/{memberId}/status")
+    @PreAuthorize("hasAnyRole('LIBRARIAN', 'ADMIN')")
+    public Mono<MemberResponse> setMemberStatus(@PathVariable String memberId,
+                                                @Valid @RequestBody MemberStatusRequest request) {
+        return profileService.changeStatus(
+                        memberId,
+                        request.status()
+                )
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Member profile not found")))
                 .map(MemberResponse::from);
     }
 

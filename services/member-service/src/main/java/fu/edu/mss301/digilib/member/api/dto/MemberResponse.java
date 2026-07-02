@@ -17,6 +17,7 @@ public record MemberResponse(
         int loanPeriodDays,
         BigDecimal outstandingBalance,
         String avatarKey,
+        String status,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -33,6 +34,7 @@ public record MemberResponse(
                 profile.getLoanPeriodDays(),
                 profile.getOutstandingBalance(),
                 profile.getAvatarKey(),
+                profile.getStatus(),
                 profile.getCreatedAt(),
                 profile.getUpdatedAt()
         );

@@ -10,6 +10,7 @@ CREATE TABLE member_profiles (
                                  loan_period_days INTEGER NOT NULL,
                                  outstanding_balance NUMERIC(12, 2),
                                  avatar_key VARCHAR(512),
+                                 status VARCHAR(50),
                                  created_at TIMESTAMPTZ,
                                  updated_at TIMESTAMPTZ
 );

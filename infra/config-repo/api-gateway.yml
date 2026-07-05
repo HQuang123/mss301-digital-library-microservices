@@ -46,6 +46,11 @@ spring:
           uri: lb://MEMBER-SERVICE
           predicates:
             - Path=/api/v1/members/**
+
+        - id: fine-service
+          uri: lb://FINE-SERVICE
+          predicates:
+            - Path=/api/fines/**
   
 management:
   endpoint:

@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: fine-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/fine_service}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+
+sepay:
+  bank: ${SEPAY_BANK:}
+  account-number: ${SEPAY_ACCOUNT_NUMBER:}
+  account-name: ${SEPAY_ACCOUNT_NAME:}
+  webhook-secret: ${SEPAY_SECRET_KEY:${SEPAY_WEBHOOK_SECRET:}}
+  qr-base-url: ${SEPAY_QR_BASE_URL:https://qr.sepay.vn/img}
+  payment-code-prefix: ${SEPAY_PAYMENT_CODE_PREFIX:FINE}
+  payment-ttl: ${SEPAY_PAYMENT_TTL:15m}
+  webhook-replay-tolerance: ${SEPAY_WEBHOOK_REPLAY_TOLERANCE:5m}

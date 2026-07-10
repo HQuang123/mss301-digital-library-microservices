@@ -186,6 +186,27 @@ public class KeycloakAdminClient {
                 .then();
     }
 
+    /**
+     * Exchange an OAuth2 authorization code (from the PKCE flow) for tokens.
+     * The client_secret is added server-side so it never reaches the browser.
+     */
+    public Mono<KeycloakTokenResponse> exchangeAuthorizationCode(String code, String codeVerifier, String redirectUri) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "authorization_code");
+        form.add("client_id", kc.getClientId());
+        form.add("client_secret", kc.getClientSecret());
+        form.add("code", code);
+        form.add("code_verifier", codeVerifier);
+        form.add("redirect_uri", redirectUri);
+
+        return webClient.post()
+                .uri(kc.tokenUrl())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .bodyToMono(KeycloakTokenResponse.class);
+    }
+
     // =========================================================================
     // Admin token management (client_credentials grant with in-process cache)
     // =========================================================================

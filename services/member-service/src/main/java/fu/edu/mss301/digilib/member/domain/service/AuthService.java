@@ -1,6 +1,7 @@
 package fu.edu.mss301.digilib.member.domain.service;
 
 import fu.edu.mss301.digilib.member.api.dto.auth.LoginRequest;
+import fu.edu.mss301.digilib.member.api.dto.auth.OAuth2ExchangeRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.RegisterRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.TokenResponse;
 import fu.edu.mss301.digilib.member.domain.entity.MemberProfile;
@@ -95,6 +96,22 @@ public class AuthService {
     public Mono<TokenResponse> login(LoginRequest request) {
         return keycloakClient
                 .getToken(request.username(), request.password())
+                .map(TokenResponse::from)
+                .onErrorMap(WebClientResponseException.class, this::mapKeycloakLoginError);
+    }
+
+    // =========================================================================
+    // OAuth2 Authorization Code Exchange
+    // =========================================================================
+
+    /**
+     * Exchanges an OAuth2 authorization code (from the PKCE redirect flow) for
+     * an access + refresh token pair.  The client_secret is added server-side
+     * so it never reaches the browser.
+     */
+    public Mono<TokenResponse> exchangeOAuth2Code(OAuth2ExchangeRequest request) {
+        return keycloakClient
+                .exchangeAuthorizationCode(request.code(), request.codeVerifier(), request.redirectUri())
                 .map(TokenResponse::from)
                 .onErrorMap(WebClientResponseException.class, this::mapKeycloakLoginError);
     }

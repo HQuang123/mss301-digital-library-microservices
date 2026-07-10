@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .pathMatchers("/actuator/**").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/auth/oauth2/exchange").permitAll()
                         // Logout requires a valid identity token
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
                         // Everything else requires an authorized identity token

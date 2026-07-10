@@ -3,6 +3,7 @@ package fu.edu.mss301.digilib.member.api.controller;
 import fu.edu.mss301.digilib.member.api.dto.MemberResponse;
 import fu.edu.mss301.digilib.member.api.dto.auth.LoginRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.LogoutRequest;
+import fu.edu.mss301.digilib.member.api.dto.auth.OAuth2ExchangeRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.RegisterRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.TokenResponse;
 import fu.edu.mss301.digilib.member.domain.service.AuthService;
@@ -46,6 +47,20 @@ public class AuthController {
     }
 
     /**
+     * Exchange an OAuth2 authorization code for tokens.
+     *
+     * The frontend sends the authorization code, PKCE code_verifier, and
+     * redirect_uri.  The backend adds the confidential client_secret and
+     * forwards the exchange to Keycloak.
+     *
+     * Returns 200 OK with access_token, refresh_token, and expiry metadata.
+     */
+    @PostMapping("/oauth2/exchange")
+    public Mono<TokenResponse> exchangeOAuth2Code(@Valid @RequestBody OAuth2ExchangeRequest request) {
+        return authService.exchangeOAuth2Code(request);
+    }
+
+    /**
      * Logout the current session.
      *
      * Requires a valid JWT in the Authorization header AND the refresh_token in
@@ -54,6 +69,7 @@ public class AuthController {
      *
      * Returns 204 No Content on success.
      */
+
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> logout(@Valid @RequestBody LogoutRequest request) {

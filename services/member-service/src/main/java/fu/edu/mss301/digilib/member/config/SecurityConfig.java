@@ -31,6 +31,8 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         // Public Actuator or health checks can go here
                         .pathMatchers("/actuator/**").permitAll()
+                        // Internal services authenticate this endpoint with X-Internal-Api-Key.
+                        .pathMatchers("/api/v1/members/internal/**").permitAll()
                         // All library operations require an authorized identity token
                         .anyExchange().authenticated()
                 )

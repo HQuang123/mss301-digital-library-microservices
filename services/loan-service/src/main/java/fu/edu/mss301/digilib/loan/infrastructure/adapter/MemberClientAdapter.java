@@ -9,11 +9,14 @@ import java.math.BigDecimal;
 @Component
 public class MemberClientAdapter {
     private final RestClient restClient;
+    private final String internalApiKey;
 
     public MemberClientAdapter(
             RestClient.Builder restClientBuilder,
-            @Value("${services.member.base-url}") String memberServiceBaseUrl
+            @Value("${services.member.base-url}") String memberServiceBaseUrl,
+            @Value("${services.internal-api-key}") String internalApiKey
     ) {
+        this.internalApiKey = internalApiKey;
         this.restClient = restClientBuilder
                 .baseUrl(memberServiceBaseUrl)
                 .build();
@@ -21,7 +24,8 @@ public class MemberClientAdapter {
 
     public MemberPolicy getPolicy(String memberId) {
         MemberResponse response = restClient.get()
-                .uri("/api/v1/members/{memberId}", memberId)
+                .uri("/api/v1/members/internal/{memberId}", memberId)
+                .header("X-Internal-Api-Key", internalApiKey)
                 .retrieve()
                 .body(MemberResponse.class);
 

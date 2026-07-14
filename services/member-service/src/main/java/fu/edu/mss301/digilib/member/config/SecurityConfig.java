@@ -3,6 +3,7 @@ package fu.edu.mss301.digilib.member.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
@@ -29,11 +30,14 @@ public class SecurityConfig {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        // Public Actuator or health checks can go here
+                        // Public endpoints — no JWT required
                         .pathMatchers("/actuator/**").permitAll()
-                        // Internal services authenticate this endpoint with X-Internal-Api-Key.
-                        .pathMatchers("/api/v1/members/internal/**").permitAll()
-                        // All library operations require an authorized identity token
+                        .pathMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/auth/oauth2/exchange").permitAll()
+                        // Logout requires a valid identity token
+                        .pathMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
+                        // Everything else requires an authorized identity token
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

@@ -40,6 +40,7 @@ public class MemberProfileService {
                             .borrowingLimit(5)
                             .loanPeriodDays(14)
                             .outstandingBalance(BigDecimal.ZERO)
+                            .status("UNLOCKED")
                             .createdAt(now)
                             .updatedAt(now)
                             .isNewRecord(true) // Crucial flag for R2DBC manual ID mapping
@@ -64,6 +65,14 @@ public class MemberProfileService {
                         profile.setAvatarKey(avatarKey);
                     }
                     profile.setUpdatedAt(Instant.now());
+                    return repository.save(profile);
+                });
+    }
+
+    public Mono<MemberProfile> changeStatus(String id, String status) {
+        return repository.findById(id)
+                .flatMap(profile -> {
+                    profile.setStatus(status.toUpperCase());
                     return repository.save(profile);
                 });
     }

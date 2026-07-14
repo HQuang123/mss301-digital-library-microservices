@@ -42,6 +42,8 @@ public class MemberProfile implements Persistable<String> {
     private Instant createdAt;
     @Column("updated_at")
     private Instant updatedAt;
+    @Column("status")
+    private String status;
 
     @Transient
     @Builder.Default

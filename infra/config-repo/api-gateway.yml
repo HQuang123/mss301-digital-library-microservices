@@ -4,6 +4,25 @@ server:
 spring:
   cloud:
     gateway:
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - http://localhost:5173
+              - http://127.0.0.1:5173
+              - http://localhost:4173
+              - http://127.0.0.1:4173
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
       routes:
         # Route DÀNH RIÊNG để test Bulkhead (Không cắm Timeout 2s, Không dùng Retry)
         - id: catalog-bulkhead-demo
@@ -36,6 +55,11 @@ spring:
                   maxBackoff: 2000ms
                   factor: 2
                   basedOnPreviousValue: false
+
+        - id: catalog-files
+          uri: lb://CATALOG-SERVICE
+          predicates:
+            - Path=/files/**
 
         - id: loan-service
           uri: lb://LOAN-SERVICE

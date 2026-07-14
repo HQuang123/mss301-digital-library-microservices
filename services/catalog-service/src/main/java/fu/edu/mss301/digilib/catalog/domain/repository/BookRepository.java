@@ -17,7 +17,11 @@ public interface BookRepository {
 
     Page<Book> findAllBooks(Pageable pageable);
 
+    Page<Book> findDeletedBooks(Pageable pageable);
+
     Optional<Book> findBookById(Long bookId);
+
+    Optional<Book> findBookByIdIncludingDeleted(Long bookId);
 
     Optional<Book> findBookByIsbn(String isbn);
 
@@ -28,4 +32,6 @@ public interface BookRepository {
     Page<Book> findBooksByClassificationId(Long classificationId, Pageable pageable);
 
     Page<Book> findBooksByAvailabilityStatus(String availabilityStatus, Pageable pageable);
+
+    Optional<BookAggregate> findAggregateByBookIdIncludingDeleted(Long bookId);
 }

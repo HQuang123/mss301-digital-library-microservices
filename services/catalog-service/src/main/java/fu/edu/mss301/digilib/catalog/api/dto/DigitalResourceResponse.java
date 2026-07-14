@@ -22,6 +22,7 @@ public class DigitalResourceResponse {
     private String accessPermission;
     private LocalDateTime uploadedAt;
     private Long bookId;
+    private Boolean isDeleted;
 
     public static DigitalResourceResponse from(DigitalResource resource) {
         Book book = resource.getBook();
@@ -31,7 +32,8 @@ public class DigitalResourceResponse {
                 resource.getResourceUrl(),
                 resource.getAccessPermission(),
                 resource.getUploadedAt(),
-                book != null ? book.getBookId() : null
+                book != null ? book.getBookId() : null,
+                Boolean.TRUE.equals(resource.getIsDeleted())
         );
     }
 }

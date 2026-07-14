@@ -12,9 +12,15 @@ public interface ClassificationRepository {
 
     Page<Classification> findAllClassifications(Pageable pageable);
 
+    Page<Classification> findDeletedClassifications(Pageable pageable);
+
     Optional<Classification> findClassificationById(Long classificationId);
+
+    Optional<Classification> findDeletedClassificationById(Long classificationId);
 
     Page<Classification> searchClassifications(String keyword, Pageable pageable);
 
     void deleteClassificationById(Long classificationId);
+
+    void restoreClassificationById(Long classificationId);
 }

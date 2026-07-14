@@ -10,8 +10,11 @@ import fu.edu.mss301.digilib.catalog.application.usecase.ManageBookCopyUseCase;
 import fu.edu.mss301.digilib.catalog.domain.entity.Book;
 import fu.edu.mss301.digilib.catalog.domain.entity.BookCopy;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -22,17 +25,25 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/catalog")
 @RequiredArgsConstructor
 public class BookCopyController {
+    private static final Logger log = LoggerFactory.getLogger(BookCopyController.class);
 
     private final ManageBookCopyUseCase manageBookCopyUseCase;
 
     @GetMapping("/book-copies")
     public Page<BookCopyResponse> getBookCopies(Pageable pageable) {
         return manageBookCopyUseCase.findAll(pageable)
+                .map(BookCopyResponse::from);
+    }
+
+    @GetMapping("/book-copies/deleted")
+    public Page<BookCopyResponse> getDeletedBookCopies(Pageable pageable) {
+        return manageBookCopyUseCase.findDeleted(pageable)
                 .map(BookCopyResponse::from);
     }
 
@@ -45,43 +56,92 @@ public class BookCopyController {
     public BookResponse addBookCopy(
             @PathVariable Long bookId,
             @RequestBody BookCopyRequest request) {
-        return BookResponse.from(
-                manageBookCopyUseCase.add(new BookCopyCommand(
-                        bookId,
-                        null,
-                        request.getBarcode(),
-                        request.getShelfLocation(),
-                        request.getAcquisitionDate(),
-                        null,
-                        null,
-                        request.getUserId())).getBook());
+        try {
+            return BookResponse.from(
+                    manageBookCopyUseCase.add(new BookCopyCommand(
+                            bookId,
+                            null,
+                            request.getBarcode(),
+                            request.getShelfLocation(),
+                            request.getAcquisitionDate(),
+                            request.getCopyStatus(),
+                            null,
+                            request.getUserId())).getBook());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not add book copy for bookId={} and userId={}", bookId, request.getUserId(), exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not add book copy: " + exception.getMessage(),
+                    exception);
+        }
     }
 
     @PutMapping("/book-copies/{copyId}")
     public BookResponse updateBookCopy(
             @PathVariable Long copyId,
             @RequestBody BookCopyRequest request) {
-        Long bookId = getBookId(manageBookCopyUseCase.findById(copyId));
-        return BookResponse.from(
-                manageBookCopyUseCase.update(new BookCopyCommand(
-                        bookId,
-                        copyId,
-                        request.getBarcode(),
-                        request.getShelfLocation(),
-                        request.getAcquisitionDate(),
-                        request.getCopyStatus(),
-                        null,
-                        request.getUserId())).getBook());
+        try {
+            Long bookId = getBookId(manageBookCopyUseCase.findById(copyId));
+            return BookResponse.from(
+                    manageBookCopyUseCase.update(new BookCopyCommand(
+                            bookId,
+                            copyId,
+                            request.getBarcode(),
+                            request.getShelfLocation(),
+                            request.getAcquisitionDate(),
+                            request.getCopyStatus(),
+                            null,
+                            request.getUserId())).getBook());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not update book copyId={} and userId={}", copyId, request.getUserId(), exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not update book copy: " + exception.getMessage(),
+                    exception);
+        }
     }
 
     @DeleteMapping("/book-copies/{copyId}")
     public BookResponse deleteBookCopy(
             @PathVariable Long copyId,
             @RequestParam(required = false) Integer userId) {
-        Long bookId = getBookId(manageBookCopyUseCase.findById(copyId));
-        return BookResponse.from(
-                manageBookCopyUseCase.delete(new BookCopyCommand(bookId, copyId, null, null, null,
-                        null, null, userId)).getBook());
+        try {
+            Long bookId = getBookId(manageBookCopyUseCase.findById(copyId));
+            return BookResponse.from(
+                    manageBookCopyUseCase.delete(new BookCopyCommand(bookId, copyId, null, null, null,
+                            null, null, userId)).getBook());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not soft delete book copyId={} and userId={}", copyId, userId, exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not soft delete book copy: " + exception.getMessage(),
+                    exception);
+        }
+    }
+
+    @PutMapping("/book-copies/{copyId}/restore")
+    public BookResponse restoreBookCopy(
+            @PathVariable Long copyId,
+            @RequestParam(required = false) Integer userId) {
+        try {
+            return BookResponse.from(
+                    manageBookCopyUseCase.restore(new BookCopyCommand(null, copyId, null, null, null,
+                            null, null, userId)).getBook());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not restore book copyId={} and userId={}", copyId, userId, exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not restore book copy: " + exception.getMessage(),
+                    exception);
+        }
     }
 
     @GetMapping("/books/{bookId}/copies")
@@ -94,17 +154,27 @@ public class BookCopyController {
     public BookResponse updateBookCopyStatus(
             @PathVariable Long copyId,
             @RequestBody BookCopyStatusRequest request) {
-        Long bookId = getBookId(manageBookCopyUseCase.findById(copyId));
-        return BookResponse.from(
-                manageBookCopyUseCase.updateStatus(new BookCopyCommand(
-                        bookId,
-                        copyId,
-                        null,
-                        null,
-                        null,
-                        request.getCopyStatus(),
-                        null,
-                        request.getUserId())).getBook());
+        try {
+            Long bookId = getBookId(manageBookCopyUseCase.findById(copyId));
+            return BookResponse.from(
+                    manageBookCopyUseCase.updateStatus(new BookCopyCommand(
+                            bookId,
+                            copyId,
+                            null,
+                            null,
+                            null,
+                            request.getCopyStatus(),
+                            null,
+                            request.getUserId())).getBook());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not update status for book copyId={} and userId={}", copyId, request.getUserId(), exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not update book copy status: " + exception.getMessage(),
+                    exception);
+        }
     }
 
     @GetMapping("/book-copies/search")
@@ -130,17 +200,27 @@ public class BookCopyController {
     public BookResponse updateShelfLocation(
             @PathVariable Long copyId,
             @RequestBody ShelfLocationRequest request) {
-        Long bookId = getBookId(manageBookCopyUseCase.findById(copyId));
-        return BookResponse.from(
-                manageBookCopyUseCase.updateShelfLocation(new BookCopyCommand(
-                        bookId,
-                        copyId,
-                        null,
-                        request.getShelfLocation(),
-                        null,
-                        null,
-                        null,
-                        request.getUserId())).getBook());
+        try {
+            Long bookId = getBookId(manageBookCopyUseCase.findById(copyId));
+            return BookResponse.from(
+                    manageBookCopyUseCase.updateShelfLocation(new BookCopyCommand(
+                            bookId,
+                            copyId,
+                            null,
+                            request.getShelfLocation(),
+                            null,
+                            null,
+                            null,
+                            request.getUserId())).getBook());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not update shelf location for book copyId={} and userId={}", copyId, request.getUserId(), exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not update book copy shelf location: " + exception.getMessage(),
+                    exception);
+        }
     }
 
     private Long getBookId(BookCopy copy) {

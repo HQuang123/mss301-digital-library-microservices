@@ -31,8 +31,18 @@ public class BookCopyRepositoryAdapter implements BookCopyRepository {
     }
 
     @Override
+    public Page<BookCopy> findDeletedBookCopies(Pageable pageable) {
+        return bookCopyJpaRepository.findDeleted(pageable);
+    }
+
+    @Override
     public Optional<BookCopy> findBookCopyById(Long copyId) {
         return bookCopyJpaRepository.findById(copyId);
+    }
+
+    @Override
+    public Optional<BookCopy> findDeletedBookCopyById(Long copyId) {
+        return bookCopyJpaRepository.findDeletedById(copyId);
     }
 
     @Override
@@ -62,6 +72,11 @@ public class BookCopyRepositoryAdapter implements BookCopyRepository {
     @Override
     public void deleteBookCopyById(Long copyId) {
         bookCopyJpaRepository.deleteById(copyId);
+    }
+
+    @Override
+    public void restoreBookCopyById(Long copyId) {
+        bookCopyJpaRepository.restoreById(copyId);
     }
 
     private Specification<BookCopy> byFilter(BookCopy.CopyStatus copyStatus, String shelfLocation) {

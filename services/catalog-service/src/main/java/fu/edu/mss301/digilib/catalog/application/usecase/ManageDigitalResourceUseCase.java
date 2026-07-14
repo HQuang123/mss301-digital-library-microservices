@@ -11,8 +11,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -47,6 +45,12 @@ public class ManageDigitalResourceUseCase {
     public BookAggregate delete(DigitalResourceCommand command) {
         BookAggregate aggregate = findAggregate(command.getBookId());
         aggregate.removeDigitalResource(command.getResourceId(), command.getUserId());
+        return bookRepository.save(aggregate);
+    }
+
+    public BookAggregate restore(DigitalResourceCommand command) {
+        BookAggregate aggregate = findAggregateIncludingDeleted(command.getBookId());
+        aggregate.restoreDigitalResource(command.getResourceId(), command.getUserId());
         return bookRepository.save(aggregate);
     }
 
@@ -106,6 +110,11 @@ public class ManageDigitalResourceUseCase {
 
     private BookAggregate findAggregate(Long bookId) {
         return bookRepository.findAggregateByBookId(bookId)
+                .orElseThrow(() -> new IllegalArgumentException("Book aggregate not found"));
+    }
+
+    private BookAggregate findAggregateIncludingDeleted(Long bookId) {
+        return bookRepository.findAggregateByBookIdIncludingDeleted(bookId)
                 .orElseThrow(() -> new IllegalArgumentException("Book aggregate not found"));
     }
 }

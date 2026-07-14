@@ -27,8 +27,18 @@ public class ClassificationRepositoryAdapter implements ClassificationRepository
     }
 
     @Override
+    public Page<Classification> findDeletedClassifications(Pageable pageable) {
+        return classificationJpaRepository.findDeleted(pageable);
+    }
+
+    @Override
     public Optional<Classification> findClassificationById(Long classificationId) {
         return classificationJpaRepository.findById(classificationId);
+    }
+
+    @Override
+    public Optional<Classification> findDeletedClassificationById(Long classificationId) {
+        return classificationJpaRepository.findDeletedById(classificationId);
     }
 
     @Override
@@ -42,6 +52,11 @@ public class ClassificationRepositoryAdapter implements ClassificationRepository
 
     @Override
     public void deleteClassificationById(Long classificationId) {
-        classificationJpaRepository.deleteById(classificationId);
+        classificationJpaRepository.softDeleteById(classificationId);
+    }
+
+    @Override
+    public void restoreClassificationById(Long classificationId) {
+        classificationJpaRepository.restoreById(classificationId);
     }
 }

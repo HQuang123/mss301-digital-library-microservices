@@ -27,6 +27,7 @@ public class ManageBookCopyUseCase {
                 command.getBarcode(),
                 command.getShelfLocation(),
                 command.getAcquisitionDate(),
+                command.getCopyStatus(),
                 command.getUserId()
         );
         return bookRepository.save(aggregate);
@@ -51,6 +52,21 @@ public class ManageBookCopyUseCase {
         return bookRepository.save(aggregate);
     }
 
+    public BookAggregate restore(BookCopyCommand command) {
+        BookCopy deletedCopy = bookCopyRepository.findDeletedBookCopyById(command.getCopyId())
+                .orElseThrow(() -> new IllegalArgumentException("Deleted book copy not found"));
+        Long bookId = deletedCopy.getBook() != null ? deletedCopy.getBook().getBookId() : command.getBookId();
+        if (bookId == null) {
+            throw new IllegalArgumentException("Book copy is not assigned to a book");
+        }
+
+        bookCopyRepository.restoreBookCopyById(command.getCopyId());
+
+        BookAggregate aggregate = findAggregate(bookId);
+        aggregate.updateCopyStatus(command.getCopyId(), deletedCopy.getCopyStatus(), command.getUserId());
+        return bookRepository.save(aggregate);
+    }
+
     public BookAggregate updateStatus(BookCopyCommand command) {
         BookAggregate aggregate = findAggregate(command.getBookId());
         aggregate.updateCopyStatus(command.getCopyId(), command.getCopyStatus(), command.getUserId());
@@ -70,6 +86,11 @@ public class ManageBookCopyUseCase {
     @Transactional(readOnly = true)
     public Page<BookCopy> findAll(Pageable pageable) {
         return bookCopyRepository.findAllBookCopies(pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<BookCopy> findDeleted(Pageable pageable) {
+        return bookCopyRepository.findDeletedBookCopies(pageable);
     }
 
     @Transactional(readOnly = true)

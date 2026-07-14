@@ -41,6 +41,17 @@ public class BookRepositoryAdapter implements BookRepository {
         bookCopyJpaRepository.saveAll(bookAggregate.getBookCopies());
         digitalResourceJpaRepository.saveAll(bookAggregate.getDigitalResources());
         bookAuditLogJpaRepository.saveAll(bookAggregate.getAuditLogs());
+
+        // Initialize lazy relations before leaving the transaction so controllers can
+        // safely map BookResponse after save/update copy/resource operations.
+        if (savedBook.getCategory() != null) {
+            savedBook.getCategory().getCategoryId();
+            savedBook.getCategory().getCategoryName();
+        }
+        if (savedBook.getClassification() != null) {
+            savedBook.getClassification().getClassificationId();
+            savedBook.getClassification().getClassificationName();
+        }
         return bookAggregate;
     }
 
@@ -56,6 +67,17 @@ public class BookRepositoryAdapter implements BookRepository {
     }
 
     @Override
+    public Optional<BookAggregate> findAggregateByBookIdIncludingDeleted(Long bookId) {
+        return bookJpaRepository.findByIdIncludingDeleted(bookId)
+                .map(book -> BookAggregate.rehydrate(
+                        book,
+                        bookCopyJpaRepository.findByBookBookId(bookId),
+                        digitalResourceJpaRepository.findByBookBookIdIncludingDeleted(bookId),
+                        bookAuditLogJpaRepository.findByBookBookId(bookId)
+                ));
+    }
+
+    @Override
     public void deleteBookById(Long bookId) {
         bookJpaRepository.deleteById(bookId);
     }
@@ -66,8 +88,18 @@ public class BookRepositoryAdapter implements BookRepository {
     }
 
     @Override
+    public Page<Book> findDeletedBooks(Pageable pageable) {
+        return bookJpaRepository.findDeletedBooks(pageable);
+    }
+
+    @Override
     public Optional<Book> findBookById(Long bookId) {
         return bookJpaRepository.findById(bookId);
+    }
+
+    @Override
+    public Optional<Book> findBookByIdIncludingDeleted(Long bookId) {
+        return bookJpaRepository.findByIdIncludingDeleted(bookId);
     }
 
     @Override

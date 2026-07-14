@@ -27,8 +27,18 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
     }
 
     @Override
+    public Page<Category> findDeletedCategories(Pageable pageable) {
+        return categoryJpaRepository.findDeleted(pageable);
+    }
+
+    @Override
     public Optional<Category> findCategoryById(Long categoryId) {
         return categoryJpaRepository.findById(categoryId);
+    }
+
+    @Override
+    public Optional<Category> findDeletedCategoryById(Long categoryId) {
+        return categoryJpaRepository.findDeletedById(categoryId);
     }
 
     @Override
@@ -42,6 +52,11 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
 
     @Override
     public void deleteCategoryById(Long categoryId) {
-        categoryJpaRepository.deleteById(categoryId);
+        categoryJpaRepository.softDeleteById(categoryId);
+    }
+
+    @Override
+    public void restoreCategoryById(Long categoryId) {
+        categoryJpaRepository.restoreById(categoryId);
     }
 }

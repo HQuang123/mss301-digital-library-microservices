@@ -17,17 +17,20 @@ final class BookCopyManager {
             String barcode,
             String shelfLocation,
             LocalDate acquisitionDate,
+            BookCopy.CopyStatus copyStatus,
             Integer userId
     ) {
         validateBarcode(barcode);
         validateShelfLocation(shelfLocation);
         validateAcquisitionDate(acquisitionDate);
+        BookCopy.CopyStatus nextCopyStatus = copyStatus == null ? BookCopy.CopyStatus.AVAILABLE : copyStatus;
+        validateCopyStatus(nextCopyStatus);
 
         BookCopy copy = BookCopy.builder()
                 .barcode(barcode)
                 .shelfLocation(shelfLocation)
                 .acquisitionDate(acquisitionDate)
-                .copyStatus(BookCopy.CopyStatus.AVAILABLE)
+                .copyStatus(nextCopyStatus)
                 .book(aggregate.getBook())
                 .build();
 
@@ -62,7 +65,7 @@ final class BookCopyManager {
 
     static void removeBookCopy(BookAggregate aggregate, Long copyId, Integer userId) {
         BookCopy copy = findCopyById(aggregate.mutableBookCopies(), copyId);
-        aggregate.mutableBookCopies().remove(copy);
+        copy.softDelete();
         updateBookStatusFromCopies(aggregate);
         addAuditLog(aggregate, userId);
     }
@@ -97,7 +100,7 @@ final class BookCopyManager {
 
     private static void updateBookStatusFromCopies(BookAggregate aggregate) {
         boolean hasUsableCopy = aggregate.mutableBookCopies().stream()
-                .anyMatch(copy -> copy.getCopyStatus() == BookCopy.CopyStatus.AVAILABLE);
+                .anyMatch(copy -> !Boolean.TRUE.equals(copy.getIsDeleted()) && copy.getCopyStatus() == BookCopy.CopyStatus.AVAILABLE);
 
         aggregate.getBook().setBookStatus(hasUsableCopy ? Book.BookStatus.ACTIVE : Book.BookStatus.INACTIVE);
     }

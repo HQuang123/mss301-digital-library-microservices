@@ -54,7 +54,13 @@ final class DigitalResourceManager {
 
     static void removeDigitalResource(BookAggregate aggregate, Long resourceId, Integer userId) {
         DigitalResource resource = findDigitalResourceById(aggregate.mutableDigitalResources(), resourceId);
-        aggregate.mutableDigitalResources().remove(resource);
+        resource.softDelete();
+        addAuditLog(aggregate, userId);
+    }
+
+    static void restoreDigitalResource(BookAggregate aggregate, Long resourceId, Integer userId) {
+        DigitalResource resource = findDigitalResourceById(aggregate.mutableDigitalResources(), resourceId);
+        resource.restore();
         addAuditLog(aggregate, userId);
     }
 

@@ -8,8 +8,11 @@ import fu.edu.mss301.digilib.catalog.application.command.CategoryCommand;
 import fu.edu.mss301.digilib.catalog.application.usecase.ManageBookUseCase;
 import fu.edu.mss301.digilib.catalog.application.usecase.ManageCategoryUseCase;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,12 +23,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 @RestController
 @RequestMapping("/api/catalog")
 @RequiredArgsConstructor
 public class CategoryController {
+    private static final Logger log = LoggerFactory.getLogger(CategoryController.class);
 
     private final ManageCategoryUseCase manageCategoryUseCase;
     private final ManageBookUseCase manageBookUseCase;
@@ -33,6 +38,12 @@ public class CategoryController {
     @GetMapping("/categories")
     public Page<CategoryResponse> getCategories(Pageable pageable) {
         return manageCategoryUseCase.findAll(pageable)
+                .map(CategoryResponse::from);
+    }
+
+    @GetMapping("/categories/deleted")
+    public Page<CategoryResponse> getDeletedCategories(Pageable pageable) {
+        return manageCategoryUseCase.findDeleted(pageable)
                 .map(CategoryResponse::from);
     }
 
@@ -67,8 +78,34 @@ public class CategoryController {
 
     @DeleteMapping("/categories/{categoryId}")
     public ResponseEntity<Void> deleteCategory(@PathVariable Long categoryId) {
-        manageCategoryUseCase.delete(new CategoryCommand(categoryId, null, null, null));
-        return ResponseEntity.noContent().build();
+        try {
+            manageCategoryUseCase.delete(new CategoryCommand(categoryId, null, null, null));
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not soft delete categoryId={}", categoryId, exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not soft delete category: " + exception.getMessage(),
+                    exception);
+        }
+    }
+
+    @PutMapping("/categories/{categoryId}/restore")
+    public CategoryResponse restoreCategory(@PathVariable Long categoryId) {
+        try {
+            return CategoryResponse.from(
+                    manageCategoryUseCase.restore(new CategoryCommand(categoryId, null, null, null)));
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not restore categoryId={}", categoryId, exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not restore category: " + exception.getMessage(),
+                    exception);
+        }
     }
 
     @GetMapping("/categories/search")

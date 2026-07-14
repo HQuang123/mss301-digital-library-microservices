@@ -8,8 +8,11 @@ import fu.edu.mss301.digilib.catalog.application.command.ClassificationCommand;
 import fu.edu.mss301.digilib.catalog.application.usecase.ManageBookUseCase;
 import fu.edu.mss301.digilib.catalog.application.usecase.ManageClassificationUseCase;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,12 +23,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 @RestController
 @RequestMapping("/api/catalog")
 @RequiredArgsConstructor
 public class ClassificationController {
+    private static final Logger log = LoggerFactory.getLogger(ClassificationController.class);
 
     private final ManageClassificationUseCase manageClassificationUseCase;
     private final ManageBookUseCase manageBookUseCase;
@@ -33,6 +38,12 @@ public class ClassificationController {
     @GetMapping("/classifications")
     public Page<ClassificationResponse> getClassifications(Pageable pageable) {
         return manageClassificationUseCase.findAll(pageable)
+                .map(ClassificationResponse::from);
+    }
+
+    @GetMapping("/classifications/deleted")
+    public Page<ClassificationResponse> getDeletedClassifications(Pageable pageable) {
+        return manageClassificationUseCase.findDeleted(pageable)
                 .map(ClassificationResponse::from);
     }
 
@@ -70,8 +81,34 @@ public class ClassificationController {
 
     @DeleteMapping("/classifications/{classificationId}")
     public ResponseEntity<Void> deleteClassification(@PathVariable Long classificationId) {
-        manageClassificationUseCase.delete(new ClassificationCommand(classificationId, null, null, null, null));
-        return ResponseEntity.noContent().build();
+        try {
+            manageClassificationUseCase.delete(new ClassificationCommand(classificationId, null, null, null, null));
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not soft delete classificationId={}", classificationId, exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not soft delete classification: " + exception.getMessage(),
+                    exception);
+        }
+    }
+
+    @PutMapping("/classifications/{classificationId}/restore")
+    public ClassificationResponse restoreClassification(@PathVariable Long classificationId) {
+        try {
+            return ClassificationResponse.from(
+                    manageClassificationUseCase.restore(new ClassificationCommand(classificationId, null, null, null, null)));
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Could not restore classificationId={}", classificationId, exception);
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Could not restore classification: " + exception.getMessage(),
+                    exception);
+        }
     }
 
     @GetMapping("/classifications/search")

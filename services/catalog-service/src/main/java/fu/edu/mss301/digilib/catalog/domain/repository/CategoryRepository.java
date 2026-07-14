@@ -12,9 +12,15 @@ public interface CategoryRepository {
 
     Page<Category> findAllCategories(Pageable pageable);
 
+    Page<Category> findDeletedCategories(Pageable pageable);
+
     Optional<Category> findCategoryById(Long categoryId);
+
+    Optional<Category> findDeletedCategoryById(Long categoryId);
 
     Page<Category> searchCategories(String keyword, Pageable pageable);
 
     void deleteCategoryById(Long categoryId);
+
+    void restoreCategoryById(Long categoryId);
 }

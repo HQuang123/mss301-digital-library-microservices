@@ -12,7 +12,11 @@ public interface BookCopyRepository {
 
     Page<BookCopy> findAllBookCopies(Pageable pageable);
 
+    Page<BookCopy> findDeletedBookCopies(Pageable pageable);
+
     Optional<BookCopy> findBookCopyById(Long copyId);
+
+    Optional<BookCopy> findDeletedBookCopyById(Long copyId);
 
     Optional<BookCopy> findBookCopyByBarcode(String barcode);
 
@@ -23,4 +27,6 @@ public interface BookCopyRepository {
     Page<BookCopy> filterBookCopies(BookCopy.CopyStatus copyStatus, String shelfLocation, Pageable pageable);
 
     void deleteBookCopyById(Long copyId);
+
+    void restoreBookCopyById(Long copyId);
 }

@@ -105,6 +105,12 @@ public class ManageBookUseCase {
         return bookRepository.save(aggregate);
     }
 
+    public BookAggregate restore(BookCommand command) {
+        BookAggregate aggregate = findAggregateIncludingDeleted(command.getBookId());
+        aggregate.restoreBook(command.getUserId());
+        return bookRepository.save(aggregate);
+    }
+
     public BookAggregate assignCategory(BookCommand command) {
         BookAggregate aggregate = findAggregate(command.getBookId());
         Category category = categoryRepository.findCategoryById(command.getCategoryId())
@@ -126,6 +132,11 @@ public class ManageBookUseCase {
     @Transactional(readOnly = true)
     public Page<Book> findAll(Pageable pageable) {
         return bookRepository.findAllBooks(pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Book> findDeleted(Pageable pageable) {
+        return bookRepository.findDeletedBooks(pageable);
     }
 
     @Transactional(readOnly = true)
@@ -151,6 +162,11 @@ public class ManageBookUseCase {
 
     private BookAggregate findAggregate(Long bookId) {
         return bookRepository.findAggregateByBookId(bookId)
+                .orElseThrow(() -> new IllegalArgumentException("Book aggregate not found"));
+    }
+
+    private BookAggregate findAggregateIncludingDeleted(Long bookId) {
+        return bookRepository.findAggregateByBookIdIncludingDeleted(bookId)
                 .orElseThrow(() -> new IllegalArgumentException("Book aggregate not found"));
     }
 }

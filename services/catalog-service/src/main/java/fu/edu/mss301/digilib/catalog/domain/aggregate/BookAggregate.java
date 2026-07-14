@@ -168,17 +168,23 @@ public class BookAggregate {
 
     public void deleteBook(Integer userId) {
         book.setBookStatus(Book.BookStatus.ARCHIVED);
-        book.setIsDeleted(true);
         addAuditLog(BookAuditLog.AuditAction.DELETE, userId);
+    }
+
+    public void restoreBook(Integer userId) {
+        book.setIsDeleted(false);
+        book.setBookStatus(Book.BookStatus.ACTIVE);
+        addAuditLog(BookAuditLog.AuditAction.UPDATE, userId);
     }
 
     public void addBookCopy(
             String barcode,
             String shelfLocation,
             LocalDate acquisitionDate,
+            BookCopy.CopyStatus copyStatus,
             Integer userId
     ) {
-        BookCopyManager.addBookCopy(this, barcode, shelfLocation, acquisitionDate, userId);
+        BookCopyManager.addBookCopy(this, barcode, shelfLocation, acquisitionDate, copyStatus, userId);
     }
 
     public void updateBookCopy(
@@ -225,6 +231,10 @@ public class BookAggregate {
 
     public void removeDigitalResource(Long resourceId, Integer userId) {
         DigitalResourceManager.removeDigitalResource(this, resourceId, userId);
+    }
+
+    public void restoreDigitalResource(Long resourceId, Integer userId) {
+        DigitalResourceManager.restoreDigitalResource(this, resourceId, userId);
     }
 
     public void updateDigitalResourceAccessPermission(

@@ -2,9 +2,11 @@ package fu.edu.mss301.digilib.catalog.application.usecase;
 
 import fu.edu.mss301.digilib.catalog.application.command.ClassificationCommand;
 import fu.edu.mss301.digilib.catalog.domain.entity.Classification;
+import fu.edu.mss301.digilib.catalog.domain.repository.BookRepository;
 import fu.edu.mss301.digilib.catalog.domain.repository.ClassificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ManageClassificationUseCase {
 
     private final ClassificationRepository classificationRepository;
+    private final BookRepository bookRepository;
 
     public Classification create(ClassificationCommand command) {
         Classification classification = Classification.builder()
@@ -35,12 +38,32 @@ public class ManageClassificationUseCase {
     }
 
     public void delete(ClassificationCommand command) {
-        classificationRepository.deleteClassificationById(command.getClassificationId());
+        Classification classification = findById(command.getClassificationId());
+
+        boolean hasLinkedBooks = bookRepository.findBooksByClassificationId(classification.getClassificationId(), PageRequest.of(0, 1))
+                .hasContent();
+        if (hasLinkedBooks) {
+            throw new IllegalArgumentException("Không thể xóa phân loại đang có đầu sách liên kết");
+        }
+
+        classificationRepository.deleteClassificationById(classification.getClassificationId());
+    }
+
+    public Classification restore(ClassificationCommand command) {
+        classificationRepository.findDeletedClassificationById(command.getClassificationId())
+                .orElseThrow(() -> new IllegalArgumentException("Deleted classification not found"));
+        classificationRepository.restoreClassificationById(command.getClassificationId());
+        return findById(command.getClassificationId());
     }
 
     @Transactional(readOnly = true)
     public Page<Classification> findAll(Pageable pageable) {
         return classificationRepository.findAllClassifications(pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Classification> findDeleted(Pageable pageable) {
+        return classificationRepository.findDeletedClassifications(pageable);
     }
 
     @Transactional(readOnly = true)

@@ -1,10 +1,12 @@
-server: 
-  port: 8888 
+server:
+  port: 8888
 
-spring: 
-  application: 
-    name: config-server 
-  cloud: 
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: config-server
+  cloud:
     config: 
       server: 
         git: 

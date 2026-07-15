@@ -10,17 +10,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.Map;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class NotificationCreateRequest {
-
-    @NotBlank
-    private String eventType;
+public class ReturnConfirmationRequest {
 
     @NotNull
     @Positive
@@ -30,5 +27,8 @@ public class NotificationCreateRequest {
     @Email
     private String studentEmail;
 
-    private Map<String, String> templateVariables;
+    @NotBlank
+    private String bookTitle;
+
+    private LocalDateTime returnedAt;
 }

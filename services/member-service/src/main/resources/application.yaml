@@ -1,6 +1,8 @@
 spring:
   application:
     name: member-service
+  config:
+    import: "optional:configserver:http://localhost:8888"
 
   # Reactive Database Setup via R2DBC
   r2dbc:
@@ -35,5 +37,3 @@ keycloak:
   realm: digilib-realm
   client-id: digilib-auth
   client-secret: MtmhLbjfzrt1vmEbzbEZGQ4vZitsRaqj
-  config:
-    import: "optional:configserver:http://localhost:8888"

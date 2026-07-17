@@ -11,6 +11,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "eureka.client.enabled=false",
         "spring.cloud.discovery.enabled=false",
         "spring.flyway.enabled=false",
+        "MEMBER_DB_USERNAME=test-only-database-user",
+        "MEMBER_DB_PASSWORD=test-only-database-password",
         "keycloak.base-url=http://localhost:8180",
         "keycloak.realm=digilib-realm",
         "keycloak.issuer-uri=http://localhost:8180/realms/digilib-realm",
@@ -29,6 +31,11 @@ class MemberServiceApplicationTests {
         assertThat(environment.getProperty("spring.security.oauth2.resourceserver.jwt.issuer-uri"))
                 .isEqualTo("http://localhost:8180/realms/digilib-realm");
         assertThat(environment.getProperty("server.address")).isEqualTo("127.0.0.1");
+    }
+
+    @Test
+    void postgresqlJdbcDriverIsAvailableForFlyway() throws ClassNotFoundException {
+        assertThat(Class.forName("org.postgresql.Driver")).isNotNull();
     }
 
 }

@@ -11,15 +11,15 @@ spring:
 
   # Reactive Database Setup via R2DBC
   r2dbc:
-    url: r2dbc:postgresql://localhost:5432/digilib_member
-    username: simpi
-    password: 1231
+    url: r2dbc:postgresql://${MEMBER_DB_HOST:localhost}:${MEMBER_DB_PORT:5432}/${MEMBER_DB_NAME:digilib_member}
+    username: ${MEMBER_DB_USERNAME}
+    password: ${MEMBER_DB_PASSWORD}
   # Flyway Migration Setup (operates via JDBC)
   flyway:
     enabled: true
-    url: jdbc:postgresql://localhost:5432/digilib_member
-    user: simpi
-    password: "1231"
+    url: jdbc:postgresql://${MEMBER_DB_HOST:localhost}:${MEMBER_DB_PORT:5432}/${MEMBER_DB_NAME:digilib_member}
+    user: ${MEMBER_DB_USERNAME}
+    password: ${MEMBER_DB_PASSWORD}
     locations: classpath:db/migration
     baseline-on-migrate: true
 

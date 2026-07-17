@@ -49,7 +49,27 @@ class GatewaySecurityIntegrationTests {
         webTestClient.get()
                 .uri("/api/v1/members/me")
                 .exchange()
-                .expectStatus().isUnauthorized();
+                .expectStatus().isUnauthorized()
+                .expectHeader().contentTypeCompatibleWith("application/json")
+                .expectHeader().valueEquals(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("AUTHENTICATION_REQUIRED")
+                .jsonPath("$.path").isEqualTo("/api/v1/members/me")
+                .jsonPath("$.requestId").isNotEmpty();
+    }
+
+    @Test
+    void rejectsMalformedJwtWithTheSameStructuredError() {
+        webTestClient.get()
+                .uri("/api/v1/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectHeader().contentTypeCompatibleWith("application/json")
+                .expectHeader().valueEquals(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("AUTHENTICATION_REQUIRED")
+                .jsonPath("$.path").isEqualTo("/api/v1/members/me");
     }
 
     @Test
@@ -83,7 +103,12 @@ class GatewaySecurityIntegrationTests {
                 .get()
                 .uri("/actuator/metrics")
                 .exchange()
-                .expectStatus().isForbidden();
+                .expectStatus().isForbidden()
+                .expectHeader().contentTypeCompatibleWith("application/json")
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("ACCESS_DENIED")
+                .jsonPath("$.path").isEqualTo("/actuator/metrics")
+                .jsonPath("$.requestId").isNotEmpty();
     }
 
     @Test

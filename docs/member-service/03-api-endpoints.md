@@ -28,7 +28,9 @@ All endpoints are hosted relative to the prefix `/api/v1`.
 - **Error Responses**:
   - `400 Bad Request`: Input validation failed (e.g. invalid email format, short password).
   - `409 Conflict`: Email is already registered.
-  - `503 Service Unavailable`: Keycloak identity server is unreachable.
+  - `500 Internal Server Error` / `REGISTRATION_FAILED`: The local profile could not be created; the Keycloak identity is rolled back.
+  - `503 Service Unavailable` / `VERIFICATION_EMAIL_UNAVAILABLE`: Keycloak could not send the verification email; the new identity is rolled back.
+  - `503 Service Unavailable` / `IDENTITY_SERVICE_UNAVAILABLE`: Keycloak is unreachable.
 
 ### 2. Login
 - **Method**: `POST`
@@ -143,6 +145,21 @@ All endpoints are hosted relative to the prefix `/api/v1`.
 ---
 
 ## 📦 Data Transfer Object (DTO) Schemas
+
+### Error Response Schema
+All Member Service application errors, plus API Gateway authentication and authorization failures, use a stable JSON shape:
+```json
+{
+  "timestamp": "2026-07-17T03:30:00Z",
+  "status": 401,
+  "error": "Unauthorized",
+  "code": "INVALID_CREDENTIALS",
+  "message": "Invalid username or password.",
+  "path": "/api/v1/auth/login",
+  "requestId": "c13a41e8-7"
+}
+```
+Frontend logic should use `code`; `message` remains display text and may change.
 
 ### Token Response Schema (`TokenResponse`)
 Returned upon successful login.

@@ -24,7 +24,9 @@ import java.util.List;
 public class GatewaySecurityConfig {
 
     @Bean
-    public SecurityWebFilterChain gatewaySecurityWebFilterChain(ServerHttpSecurity http) {
+    public SecurityWebFilterChain gatewaySecurityWebFilterChain(
+            ServerHttpSecurity http,
+            GatewaySecurityErrorWriter securityErrorWriter) {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 // CorsWebFilter is ordered before Spring Security so browser
@@ -42,8 +44,13 @@ public class GatewaySecurityConfig {
                         // without forwarding this private service-to-service path.
                         .pathMatchers("/api/v1/members/internal/**").permitAll()
                         .anyExchange().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
-                        jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(securityErrorWriter)
+                        .accessDeniedHandler(securityErrorWriter))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(securityErrorWriter)
+                        .accessDeniedHandler(securityErrorWriter)
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 .build();
     }
 

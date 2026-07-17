@@ -52,14 +52,16 @@ The client application can decode the OIDC JWT (using libraries like `jwt-decode
 Implement specific UX flows depending on HTTP error statuses returned by `/api/v1/auth/login`:
 
 ### A. E-mail Verification Block (`403 Forbidden`)
-If login returns a `403` status with the message `"Your account setup is not complete. Please check your email for a verification link."`:
+If login returns `403` with code `ACCOUNT_SETUP_INCOMPLETE` or `EMAIL_NOT_VERIFIED`:
 - **UX Action**: Do **not** redirect the user to the home dashboard.
-- **UX Action**: Redirect the user to a **"Verify Your Email"** screen advising them that a verification link was sent to their email. Display a "Resend Verification" trigger if required.
+- **UX Action**: Redirect the user to a **"Verify Your Email"** screen advising them to use the verification email. Do not show a resend button until a rate-limited resend endpoint is implemented.
 
 ### B. Invalid Credentials (`401 Unauthorized`)
+- **Condition**: Error code `INVALID_CREDENTIALS`.
 - **UX Action**: Display a clear warning banner: `"Invalid username or password."`
 
 ### C. Rate-Limiting Lockout (`429 Too Many Requests`)
+- **Condition**: Error code `TOO_MANY_ATTEMPTS`.
 - **UX Action**: Block login attempts and show a countdown or message: `"Too many failed attempts. Please wait before trying again."`
 
 ---
@@ -70,6 +72,7 @@ If login returns a `403` status with the message `"Your account setup is not com
 - Form fields: `email`, `password`, `firstName`, `lastName`.
 - Submit to: `POST /api/v1/auth/register`.
 - On success: Immediately redirect user to the verification warning screen (since their account is unverified by default).
+- On `VERIFICATION_EMAIL_UNAVAILABLE`: Keep the form state and offer retry; the partially created Keycloak user has already been rolled back.
 
 ### Account Profile Page
 - On load: Fetch user data from `GET /api/v1/members/me`.

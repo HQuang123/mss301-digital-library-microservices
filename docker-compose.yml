@@ -4,9 +4,9 @@ services:
     container_name: digilib-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:digilib_identity}
-      POSTGRES_USER: ${POSTGRES_USER:digilib}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:digilib}
+      POSTGRES_DB: ${POSTGRES_DB:-digilib_identity}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
       - "5432:5432"
     volumes:

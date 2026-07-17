@@ -4,6 +4,7 @@ import fu.edu.mss301.digilib.member.api.dto.auth.LoginRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.OAuth2ExchangeRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.RegisterRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.TokenResponse;
+import fu.edu.mss301.digilib.member.api.error.ApiException;
 import fu.edu.mss301.digilib.member.domain.entity.MemberProfile;
 import fu.edu.mss301.digilib.member.infrastructure.keycloak.KeycloakAdminClient;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 /**
@@ -49,39 +49,28 @@ public class AuthService {
      */
     public Mono<MemberProfile> register(RegisterRequest request) {
         return keycloakClient
-                // ── Step 1: create the Keycloak user ─────────────────────────
                 .createUser(request.email(), request.firstName(), request.lastName())
                 .onErrorMap(WebClientResponseException.class, ex -> mapKeycloakRegisterError(ex, request.email()))
-
-                // ── Step 2: set the password ──────────────────────────────────
                 .flatMap(keycloakId -> keycloakClient
                         .setPassword(keycloakId, request.password())
-                        .onErrorMap(WebClientResponseException.class, ex -> mapPasswordPolicyError(ex))
-                        .thenReturn(keycloakId)
-                )
-
-                // ── Step 3: send verification email ──────────────────────────
-                .flatMap(keycloakId -> keycloakClient
-                        .sendVerificationEmail(keycloakId)
-                        .doOnError(e -> log.warn("Failed to send verification email for {}: {}", keycloakId, e.getMessage()))
-                        // Non-fatal: don't block registration if email dispatch fails
-                        .onErrorResume(e -> Mono.empty())
-                        .thenReturn(keycloakId)
-                )
-
-                // ── Step 4: create member profile (with rollback on failure) ──
-                .flatMap(keycloakId -> profileService
-                        .registerOrFetchProfile(keycloakId, request.email(), request.firstName(), request.lastName())
-                        .onErrorResume(dbError -> {
-                            log.error("DB profile creation failed for keycloak user {}; rolling back.", keycloakId, dbError);
-                            return keycloakClient.deleteUser(keycloakId)
-                                    .doOnSuccess(v -> log.info("Rolled back Keycloak user {}", keycloakId))
-                                    .doOnError(rollbackError -> log.error("Rollback failed for {}: {}", keycloakId, rollbackError.getMessage()))
-                                    .then(Mono.error(new ResponseStatusException(
-                                            HttpStatus.INTERNAL_SERVER_ERROR,
-                                            "Registration failed. Please try again."
-                                    )));
-                        })
+                        .onErrorMap(WebClientResponseException.class, this::mapPasswordPolicyError)
+                        .then(keycloakClient.sendVerificationEmail(keycloakId)
+                                .onErrorMap(error -> new ApiException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "VERIFICATION_EMAIL_UNAVAILABLE",
+                                        "We could not send the verification email. Please try again."
+                                )))
+                        .then(Mono.defer(() -> profileService.registerOrFetchProfile(
+                                        keycloakId,
+                                        request.email(),
+                                        request.firstName(),
+                                        request.lastName())
+                                .onErrorMap(error -> new ApiException(
+                                        HttpStatus.INTERNAL_SERVER_ERROR,
+                                        "REGISTRATION_FAILED",
+                                        "Registration failed. Please try again."
+                                ))))
+                        .onErrorResume(error -> rollbackKeycloakUser(keycloakId, error))
                 );
     }
 
@@ -149,10 +138,12 @@ public class AuthService {
 
     private Throwable mapKeycloakRegisterError(WebClientResponseException ex, String email) {
         if (ex.getStatusCode() == HttpStatus.CONFLICT) {
-            return new ResponseStatusException(HttpStatus.CONFLICT, "Email '" + email + "' is already registered.");
+            return new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED",
+                    "Email '" + email + "' is already registered.");
         }
         log.error("Keycloak user creation failed with {}: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
-        return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Identity service error. Please try again.");
+        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "IDENTITY_SERVICE_UNAVAILABLE",
+                "Identity service error. Please try again.");
     }
 
     private Throwable mapPasswordPolicyError(WebClientResponseException ex) {
@@ -161,11 +152,11 @@ public class AuthService {
             String kcMessage = ex.getResponseBodyAsString();
             // Extract the message field if present, otherwise use a default
             if (kcMessage.contains("message")) {
-                return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                return new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_POLICY_VIOLATION",
                         "Password does not meet the security policy requirements.");
             }
         }
-        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid password.");
+        return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD", "Invalid password.");
     }
 
     private Throwable mapKeycloakLoginError(WebClientResponseException ex) {
@@ -175,39 +166,51 @@ public class AuthService {
         if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED || ex.getStatusCode() == HttpStatus.BAD_REQUEST) {
             // Check for specific Keycloak error codes in the JSON body
             if (body.contains("Account is not fully set up")) {
-                return new ResponseStatusException(HttpStatus.FORBIDDEN,
+                return new ApiException(HttpStatus.FORBIDDEN, "ACCOUNT_SETUP_INCOMPLETE",
                         "Your account setup is not complete. Please check your email for a verification link.");
             }
             if (body.contains("Account disabled")) {
-                return new ResponseStatusException(HttpStatus.FORBIDDEN,
+                return new ApiException(HttpStatus.FORBIDDEN, "ACCOUNT_DISABLED",
                         "Your account has been disabled. Please contact support.");
             }
             if (body.contains("invalid_grant")) {
-                return new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                return new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS",
                         "Invalid username or password.");
             }
-            if (body.contains("Account is not fully set up") || body.contains("email_not_verified")) {
-                return new ResponseStatusException(HttpStatus.FORBIDDEN,
+            if (body.contains("email_not_verified")) {
+                return new ApiException(HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED",
                         "Please verify your email address before logging in.");
             }
         }
 
         if (ex.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
-            return new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+            return new ApiException(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_ATTEMPTS",
                     "Too many failed attempts. Please wait before trying again.");
         }
 
         log.error("Unexpected Keycloak login error {}: {}", ex.getStatusCode(), body);
-        return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "AUTHENTICATION_SERVICE_UNAVAILABLE",
                 "Authentication service is temporarily unavailable.");
     }
 
     private Throwable mapKeycloakLogoutError(WebClientResponseException ex) {
         if (ex.getStatusCode() == HttpStatus.BAD_REQUEST) {
-            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REFRESH_TOKEN",
                     "The provided refresh token is invalid or has already expired.");
         }
-        return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "LOGOUT_SERVICE_UNAVAILABLE",
                 "Logout service is temporarily unavailable.");
+    }
+
+    private <T> Mono<T> rollbackKeycloakUser(String keycloakId, Throwable originalError) {
+        log.warn("Registration failed after creating Keycloak user {}; rolling back: {}",
+                keycloakId, originalError.getMessage());
+        return keycloakClient.deleteUser(keycloakId)
+                .doOnSuccess(ignored -> log.info("Rolled back Keycloak user {}", keycloakId))
+                .onErrorResume(rollbackError -> {
+                    log.error("Rollback failed for Keycloak user {}: {}", keycloakId, rollbackError.getMessage());
+                    return Mono.empty();
+                })
+                .then(Mono.error(originalError));
     }
 }

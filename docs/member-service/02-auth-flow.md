@@ -6,7 +6,7 @@ The Member Service acts as an OIDC client interface, wrapping complex Keycloak a
 
 ## 📝 1. User Registration Saga (With Compensation Rollback)
 
-Registration is handled as a two-step transactional saga to prevent orphaned accounts or inconsistent state across Keycloak and our local PostgreSQL database.
+Registration is handled as a compensating saga to prevent orphaned accounts or inconsistent state across Keycloak and the local PostgreSQL database.
 
 ```
 [Client Request]
@@ -18,25 +18,25 @@ Registration is handled as a two-step transactional saga to prevent orphaned acc
  2. setPassword() ───► (Keycloak configures a non-temporary password)
        │
        ▼
- 3. sendVerification() ► (Keycloak dispatches email. Failures here are logged as non-fatal)
+ 3. sendVerification() ► (Keycloak dispatches the verification email)
        │
        ▼
  4. saveProfile() ───► [Database Profile Creation]
        │
        ├─► Success: Return MemberResponse (201 Created)
        │
-       └─► Failure: Trigger Rollback ──► deleteUser() in Keycloak ──► Return 500 Error
+       └─► Failure after createUser(): deleteUser() in Keycloak, then return a structured error
 ```
 
 ### Flow Details:
 1. **Keycloak Provisioning**: The backend uses its admin credentials (obtained via client credentials grant) to create the user in Keycloak. The user is created as `enabled: true`, but `emailVerified: false`.
 2. **Password Configuration**: The password is saved as a permanent (non-temporary) credentials payload.
-3. **Verification Dispatch**: An asynchronous request is fired to Keycloak to dispatch its native verification email. If Keycloak fails to dispatch the email (e.g. SMTP configuration error), the saga logs a warning but *does not block* registration.
+3. **Verification Dispatch**: Keycloak dispatches its native verification email. If dispatch fails (for example, because SMTP is unavailable), registration returns `503 VERIFICATION_EMAIL_UNAVAILABLE` and deletes the newly created Keycloak user. The API never reports a successful registration when no verification email was sent.
 4. **Database Sync & Rollback**:
    - The user profile is created in the PostgreSQL `member_profiles` table, linking Keycloak's UUID (`sub`) as the primary key `id`.
-   - **Compensating Action**: If the database insert fails (e.g. connection timeout, constraints violation), a rollback is triggered. The service issues a `DELETE` command to Keycloak for that user to prevent orphan identities, then returns a `500 Internal Server Error` to the client.
+   - **Compensating Action**: If password setup, verification dispatch, or database insertion fails, the service issues a `DELETE` command to Keycloak for that user. A database failure returns `500 REGISTRATION_FAILED`. If the compensating delete also fails, that failure is logged without hiding the original client-facing error.
 
-This logic is defined in [AuthService.java](file:///media/simpi/program-files/Program%20Files/Documents/Study/Code/MSS301/mss301-digital-library-microservices/services/member-service/src/main/java/fu/edu/mss301/digilib/member/domain/service/AuthService.java#L39-L85).
+This logic is defined in `AuthService.java`.
 
 ---
 
@@ -47,15 +47,16 @@ Login uses the **Resource Owner Password Credentials (ROPC)** OIDC grant. The ba
 ### Error Mappings:
 Keycloak raw responses can be verbose or leaky. The service intercepts error JSONs and translates them to the following client-facing statuses:
 
-| Keycloak Error Condition / Substring | Local HTTP Code | Client Message |
+| Keycloak condition | HTTP status | Stable error code |
 | :--- | :--- | :--- |
-| `invalid_grant` | `401 Unauthorized` | "Invalid username or password." |
-| `Account is not fully set up` / `email_not_verified` | `403 Forbidden` | "Your account setup is not complete. Please check your email for a verification link." |
-| `Account disabled` | `403 Forbidden` | "Your account has been disabled. Please contact support." |
-| `Too many failed attempts` | `429 Too Many Requests` | "Too many failed attempts. Please wait before trying again." |
-| Any other system fail | `503 Service Unavailable` | "Authentication service is temporarily unavailable." |
+| `invalid_grant` | `401 Unauthorized` | `INVALID_CREDENTIALS` |
+| `Account is not fully set up` | `403 Forbidden` | `ACCOUNT_SETUP_INCOMPLETE` |
+| `email_not_verified` | `403 Forbidden` | `EMAIL_NOT_VERIFIED` |
+| `Account disabled` | `403 Forbidden` | `ACCOUNT_DISABLED` |
+| Too many failed attempts | `429 Too Many Requests` | `TOO_MANY_ATTEMPTS` |
+| Any other identity-provider failure | `503 Service Unavailable` | `AUTHENTICATION_SERVICE_UNAVAILABLE` |
 
-This mapping logic is located in [AuthService.java](file:///media/simpi/program-files/Program%20Files/Documents/Study/Code/MSS301/mss301-digital-library-microservices/services/member-service/src/main/java/fu/edu/mss301/digilib/member/domain/service/AuthService.java#L154-L186).
+Clients should branch on `code`, not on the human-readable `message`.
 
 ---
 

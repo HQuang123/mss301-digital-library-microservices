@@ -41,4 +41,25 @@ class LoanTest {
 
         assertThrows(IllegalStateException.class, () -> loan.renew("member-1"));
     }
+
+    @Test
+    void activeLoanCanBeMarkedLost() {
+        Loan loan = Loan.create("member-1", 2L, 3L, "PHYSICAL",
+                LocalDateTime.now().plusDays(14), "borrow-4");
+
+        loan.markLost("librarian-1");
+
+        assertEquals(LoanStatus.LOST, loan.getStatus());
+        assertEquals(LoanStatus.LOST, loan.getHistories().getLast().getToStatus());
+    }
+
+    @Test
+    void lostLoanCannotBeReturnedOrMarkedLostAgain() {
+        Loan loan = Loan.create("member-1", 2L, 3L, "PHYSICAL",
+                LocalDateTime.now().plusDays(14), "borrow-5");
+        loan.markLost("librarian-1");
+
+        assertThrows(IllegalStateException.class, () -> loan.returnBook("librarian-1"));
+        assertThrows(IllegalStateException.class, () -> loan.markLost("librarian-1"));
+    }
 }

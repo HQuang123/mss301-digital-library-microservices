@@ -43,6 +43,13 @@ public class LoanController {
         return LoanResponse.from(manageLoanUseCase.renew(loanId, actorId));
     }
 
+    @PostMapping("/loans/{loanId}/lost")
+    public LoanResponse reportLost(
+            @PathVariable Long loanId,
+            @RequestHeader(name = "X-Actor-Id", defaultValue = "SYSTEM") String actorId) {
+        return LoanResponse.from(manageLoanUseCase.reportLost(loanId, actorId));
+    }
+
     @GetMapping("/loans/{loanId}")
     public LoanResponse findById(@PathVariable Long loanId) {
         return LoanResponse.from(manageLoanUseCase.findById(loanId));

@@ -8,6 +8,7 @@ import fu.edu.mss301.digilib.loan.domain.repository.SagaOutboxRepository;
 import fu.edu.mss301.digilib.loan.domain.vo.LoanStatus;
 import fu.edu.mss301.digilib.loan.domain.vo.OutboxStatus;
 import fu.edu.mss301.digilib.loan.infrastructure.adapter.BookCatalogClientAdapter;
+import fu.edu.mss301.digilib.loan.infrastructure.adapter.FineClientAdapter;
 import fu.edu.mss301.digilib.loan.infrastructure.adapter.MemberClientAdapter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class BorrowBookUseCase {
     private final SagaOutboxRepository outboxRepository;
     private final MemberClientAdapter memberClient;
     private final BookCatalogClientAdapter catalogClient;
+    private final FineClientAdapter fineClient;
 
     @Transactional
     public Loan handle(BorrowBookCommand command) {
@@ -32,6 +34,8 @@ public class BorrowBookUseCase {
     }
 
     private Loan borrow(BorrowBookCommand command) {
+        // Fine Service is the source of truth for unpaid-fine borrowing eligibility.
+        fineClient.assertCanBorrow(command.memberId());
         MemberClientAdapter.MemberPolicy policy = memberClient.getPolicy(command.memberId());
         long activeLoans = loanRepository.countByMemberIdAndStatusIn(
                 command.memberId(), List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE));

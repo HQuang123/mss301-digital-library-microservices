@@ -19,8 +19,18 @@ services:
   internal-api-key: ${INTERNAL_API_KEY}
   catalog:
     base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+    default-book-value: ${DEFAULT_BOOK_VALUE:250000}
   member:
     base-url: ${MEMBER_SERVICE_URL:http://localhost:8083}
+  fine:
+    base-url: ${FINE_SERVICE_URL:http://localhost:8086}
+  notification:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
+
+loan:
+  jobs:
+    overdue-fine-enabled: ${OVERDUE_FINE_JOB_ENABLED:true}
+    overdue-fine-cron: ${OVERDUE_FINE_JOB_CRON:0 15 2 * * *}
 
 eureka:
   instance:

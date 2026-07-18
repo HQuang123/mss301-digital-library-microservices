@@ -125,15 +125,25 @@ public class Loan {
 
     public void returnBook(String changedBy) {
 
-        if (status == LoanStatus.RETURNED)
+        if (status != LoanStatus.BORROWED && status != LoanStatus.OVERDUE)
             throw new IllegalStateException(
-                    "Book already returned");
+                    "Only an active or overdue loan can be returned");
 
         LoanStatus previousStatus = status;
         status = LoanStatus.RETURNED;
         returnedAt = LocalDateTime.now();
         updatedAt = returnedAt;
         addHistory(previousStatus, status, changedBy, "Book returned");
+    }
+
+    public void markLost(String changedBy) {
+        if (status != LoanStatus.BORROWED && status != LoanStatus.OVERDUE) {
+            throw new IllegalStateException("Only an active or overdue loan can be marked as lost");
+        }
+        LoanStatus previousStatus = status;
+        status = LoanStatus.LOST;
+        updatedAt = LocalDateTime.now();
+        addHistory(previousStatus, status, changedBy, "Book reported lost");
     }
 
     public void markOverdue() {

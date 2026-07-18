@@ -4,8 +4,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import java.math.BigDecimal;
-
 @Component
 public class MemberClientAdapter {
     private final RestClient restClient;
@@ -23,6 +21,11 @@ public class MemberClientAdapter {
     }
 
     public MemberPolicy getPolicy(String memberId) {
+        MemberDetails member = getMember(memberId);
+        return new MemberPolicy(member.borrowingLimit(), member.loanPeriodDays());
+    }
+
+    public MemberDetails getMember(String memberId) {
         MemberResponse response = restClient.get()
                 .uri("/api/v1/members/internal/{memberId}", memberId)
                 .header("X-Internal-Api-Key", internalApiKey)
@@ -32,20 +35,26 @@ public class MemberClientAdapter {
         if (response == null) {
             throw new IllegalStateException("Member service returned an empty response");
         }
-        boolean hasDebt = response.outstandingBalance() != null
-                && response.outstandingBalance().compareTo(BigDecimal.ZERO) > 0;
-        if (hasDebt) {
-            throw new IllegalStateException("Member has an outstanding balance");
-        }
-        return new MemberPolicy(response.borrowingLimit(), response.loanPeriodDays());
+        return new MemberDetails(
+                response.id(), response.email(), response.memberCode(),
+                response.borrowingLimit(), response.loanPeriodDays());
     }
 
     public record MemberPolicy(int borrowingLimit, int loanPeriodDays) {}
 
+    public record MemberDetails(
+            String id,
+            String email,
+            String memberCode,
+            int borrowingLimit,
+            int loanPeriodDays
+    ) {}
+
     private record MemberResponse(
             String id,
+            String email,
+            String memberCode,
             int borrowingLimit,
-            int loanPeriodDays,
-            BigDecimal outstandingBalance
+            int loanPeriodDays
     ) {}
 }

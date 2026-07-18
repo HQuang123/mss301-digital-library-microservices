@@ -10,11 +10,14 @@ import java.util.Map;
 @Component
 public class BookCatalogClientAdapter {
     private final RestClient restClient;
+    private final long defaultBookValue;
 
     public BookCatalogClientAdapter(
             RestClient.Builder restClientBuilder,
-            @Value("${services.catalog.base-url}") String bookCatalogBaseUrl
+            @Value("${services.catalog.base-url}") String bookCatalogBaseUrl,
+            @Value("${services.catalog.default-book-value:250000}") long defaultBookValue
     ) {
+        this.defaultBookValue = defaultBookValue;
         this.restClient = restClientBuilder
                 .baseUrl(bookCatalogBaseUrl)
                 .build();
@@ -47,6 +50,30 @@ public class BookCatalogClientAdapter {
         updateStatus(copyId, "AVAILABLE");
     }
 
+    public void markLost(Long copyId) {
+        if (copyId == null) {
+            return;
+        }
+        updateStatus(copyId, "LOST");
+    }
+
+    public BookDetails getBookDetails(Long bookId) {
+        BookResponse response = restClient.get()
+                .uri("/api/catalog/books/{bookId}", bookId)
+                .retrieve()
+                .body(BookResponse.class);
+        if (response == null) {
+            throw new IllegalStateException("Catalog service returned an empty book response");
+        }
+        long bookValue = response.bookValue() == null || response.bookValue() <= 0
+                ? defaultBookValue
+                : response.bookValue();
+        return new BookDetails(
+                response.bookId(),
+                response.title() == null || response.title().isBlank() ? "Book " + bookId : response.title(),
+                bookValue);
+    }
+
     private void updateStatus(Long copyId, String status) {
         restClient.patch()
                 .uri("/api/catalog/book-copies/{copyId}/status", copyId)
@@ -57,4 +84,6 @@ public class BookCatalogClientAdapter {
 
     private record BookCopyPage(List<BookCopy> content) {}
     private record BookCopy(Long copyId, String copyStatus) {}
+    private record BookResponse(Long bookId, String title, Long bookValue) {}
+    public record BookDetails(Long bookId, String title, long bookValue) {}
 }

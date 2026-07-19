@@ -4,6 +4,7 @@ import fu.edu.mss301.digilib.member.api.dto.MemberResponse;
 import fu.edu.mss301.digilib.member.api.dto.auth.LoginRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.LogoutRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.OAuth2ExchangeRequest;
+import fu.edu.mss301.digilib.member.api.dto.auth.ForgotPasswordRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.RegisterRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.TokenResponse;
 import fu.edu.mss301.digilib.member.domain.service.AuthService;
@@ -74,5 +75,16 @@ public class AuthController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> logout(@Valid @RequestBody LogoutRequest request) {
         return authService.logout(request.refreshToken());
+    }
+
+    /**
+     * Trigger self-service forgot password flow.
+     *
+     * Sends a password reset email (via Keycloak) to the user's email if registered.
+     */
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Mono<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return authService.forgotPassword(request.email());
     }
 }

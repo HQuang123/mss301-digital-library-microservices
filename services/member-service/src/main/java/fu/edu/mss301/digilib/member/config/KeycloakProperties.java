@@ -52,6 +52,10 @@ public class KeycloakProperties {
         return adminUserUrl(userId) + "/send-verify-email";
     }
 
+    public String adminUserExecuteActionsEmailUrl(String userId) {
+        return adminUserUrl(userId) + "/execute-actions-email";
+    }
+
     public String tokenUrl() {
         return baseUrl + "/realms/" + realm + "/protocol/openid-connect/token";
     }

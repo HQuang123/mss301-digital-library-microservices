@@ -133,6 +133,31 @@ public class AuthService {
     }
 
     // =========================================================================
+    // Forgot Password
+    // =========================================================================
+
+    /**
+     * Look up Keycloak user by email and send a password reset verification email.
+     */
+    public Mono<Void> forgotPassword(String email) {
+        return keycloakClient.findUserByEmail(email)
+                .switchIfEmpty(Mono.error(new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "USER_NOT_FOUND",
+                        "No member account registered with this email address"
+                )))
+                .flatMap(keycloakClient::sendForgotPasswordEmail)
+                .onErrorMap(WebClientResponseException.class, ex -> {
+                    log.error("Failed to trigger forgot password flow for email {}: {}", email, ex.getResponseBodyAsString());
+                    return new ApiException(
+                            HttpStatus.SERVICE_UNAVAILABLE,
+                            "PASSWORD_RESET_EMAIL_FAILED",
+                            "We could not send the password reset email. Please try again later."
+                    );
+                });
+    }
+
+    // =========================================================================
     // Error mapping helpers
     // =========================================================================
 

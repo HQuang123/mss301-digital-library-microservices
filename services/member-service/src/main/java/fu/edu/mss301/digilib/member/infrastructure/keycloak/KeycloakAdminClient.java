@@ -127,6 +127,42 @@ public class KeycloakAdminClient {
     }
 
     /**
+     * Look up a user in Keycloak by email.
+     * @return the Keycloak user-id if found, or Mono.empty() if not.
+     */
+    public Mono<String> findUserByEmail(String email) {
+        return adminToken()
+                .flatMap(token -> webClient.get()
+                        .uri(kc.adminUsersUrl() + "?email=" + email)
+                        .header("Authorization", "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(new org.springframework.core.ParameterizedTypeReference<List<Map<String, Object>>>() {})
+                        .flatMap(users -> {
+                            if (users == null || users.isEmpty()) {
+                                return Mono.empty();
+                            }
+                            return Mono.just(String.valueOf(users.get(0).get("id")));
+                        })
+                );
+    }
+
+    /**
+     * Send a password reset email (UPDATE_PASSWORD action) to the Keycloak user.
+     */
+    public Mono<Void> sendForgotPasswordEmail(String keycloakUserId) {
+        return adminToken()
+                .flatMap(token -> webClient.put()
+                        .uri(kc.adminUserExecuteActionsEmailUrl(keycloakUserId) + "?client_id=" + kc.getClientId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(List.of("UPDATE_PASSWORD"))
+                        .retrieve()
+                        .toBodilessEntity()
+                        .then()
+                );
+    }
+
+    /**
      * Exchange username + password for a Keycloak access + refresh token pair.
      * Uses the Resource Owner Password Credentials (ROPC) grant.
      */

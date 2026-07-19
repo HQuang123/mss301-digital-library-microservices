@@ -82,4 +82,35 @@ class AuthServiceTests {
 
         verify(keycloakClient).deleteUser(KEYCLOAK_ID);
     }
+
+    @Test
+    void forgotPasswordSendsEmailWhenUserExists() {
+        String email = "test@example.com";
+        String userId = "keycloak-user-123";
+        when(keycloakClient.findUserByEmail(email)).thenReturn(Mono.just(userId));
+        when(keycloakClient.sendForgotPasswordEmail(userId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(authService.forgotPassword(email))
+                .verifyComplete();
+
+        verify(keycloakClient).findUserByEmail(email);
+        verify(keycloakClient).sendForgotPasswordEmail(userId);
+    }
+
+    @Test
+    void forgotPasswordThrowsNotFoundWhenUserDoesNotExist() {
+        String email = "nonexistent@example.com";
+        when(keycloakClient.findUserByEmail(email)).thenReturn(Mono.empty());
+
+        StepVerifier.create(authService.forgotPassword(email))
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(ApiException.class);
+                    ApiException apiException = (ApiException) error;
+                    assertThat(apiException.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+                    assertThat(apiException.getCode()).isEqualTo("USER_NOT_FOUND");
+                })
+                .verify();
+
+        verify(keycloakClient).findUserByEmail(email);
+    }
 }

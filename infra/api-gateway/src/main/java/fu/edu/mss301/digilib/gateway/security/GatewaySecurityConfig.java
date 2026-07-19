@@ -45,6 +45,11 @@ public class GatewaySecurityConfig {
                                                 // without forwarding this private service-to-service path.
                                                 .pathMatchers("/api/v1/members/internal/**").permitAll()
                                                 .pathMatchers(HttpMethod.GET, "/files/images/**").permitAll()
+                                                // SePay calls this directly with an HMAC signature
+                                                // (X-SePay-Signature), not a JWT — verified downstream
+                                                // by SepayWebhookVerifier in fine-service.
+                                                .pathMatchers(HttpMethod.POST, "/api/fines/payments/sepay/webhook")
+                                                .permitAll()
                                                 .pathMatchers(HttpMethod.POST,
                                                                 "/api/notifications/jobs/due-soon/run",
                                                                 "/api/notifications/jobs/overdue/run")

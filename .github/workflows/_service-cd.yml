@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       service_name:
-        description: Service name — used as container name, image name, and gcloud secret name
+        description: Service name — used as container name and image name
         required: true
         type: string
       host_port:
@@ -31,7 +31,7 @@ jobs:
       - name: Load secrets
         run: |
           touch secret-file
-          gcloud secrets versions access latest --secret="${{ inputs.service_name }}" >> secret-file
+          gcloud secrets versions access latest --secret="mutual-secret" >> secret-file
 
       - name: Ensure shared network exists
         run: docker network create digilib-network 2>/dev/null || true

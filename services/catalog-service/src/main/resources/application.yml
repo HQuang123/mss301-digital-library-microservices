@@ -36,7 +36,7 @@ spring:
       max-request-size: 25MB
 
 catalog:
-  upload-dir: uploads/catalog
+  upload-dir: uploads/files
 
 eureka:
   instance:

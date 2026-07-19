@@ -48,21 +48,22 @@ public class CreateNewNotificationUseCase {
 
         NotificationAggregate aggregate = NotificationAggregate.create(policy);
 
-        NotificationLog emailLog = aggregate.createEmailLogFor(command.getStudentId(), command.getStudentEmail());
-        NotificationLog websiteLog = aggregate.createWebsiteLogFor(command.getStudentId());
+        String subject = TemplateRenderer.render(aggregate.getSubjectTemplate(), command.getTemplateVariables());
+        String body = TemplateRenderer.render(aggregate.getBodyTemplate(), command.getTemplateVariables());
+
+        NotificationLog emailLog = aggregate.createEmailLogFor(
+                command.getStudentId(), command.getStudentEmail(), subject, body);
+        NotificationLog websiteLog = aggregate.createWebsiteLogFor(command.getStudentId(), subject, body);
 
         emailLog = notificationRepository.save(emailLog);
         websiteLog = notificationRepository.save(websiteLog);
 
-        sendEmail(aggregate, emailLog, command);
+        sendEmail(aggregate, emailLog, subject, body);
 
         return List.of(emailLog, websiteLog);
     }
 
-    private void sendEmail(NotificationAggregate aggregate, NotificationLog emailLog, NotificationCommand command) {
-        String subject = TemplateRenderer.render(aggregate.getSubjectTemplate(), command.getTemplateVariables());
-        String body = TemplateRenderer.render(aggregate.getBodyTemplate(), command.getTemplateVariables());
-
+    private void sendEmail(NotificationAggregate aggregate, NotificationLog emailLog, String subject, String body) {
         try {
             mailSender.send(emailLog.getStudentEmail(), subject, body);
             aggregate.markSent(emailLog);

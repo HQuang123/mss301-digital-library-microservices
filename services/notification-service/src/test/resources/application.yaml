@@ -12,6 +12,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+  flyway:
+    enabled: false
   mail:
     host: localhost
     port: 2525

@@ -22,11 +22,7 @@ public final class NotificationAggregate {
         return new NotificationAggregate(policy);
     }
 
-    public NotificationLog createLogFor(String studentId, String studentEmail) {
-        return createEmailLogFor(studentId, studentEmail);
-    }
-
-    public NotificationLog createEmailLogFor(String studentId, String studentEmail) {
+    public NotificationLog createEmailLogFor(String studentId, String studentEmail, String subject, String body) {
         validatePolicy(policy);
         String validStudentId = requireText(studentId, "studentId");
         String validStudentEmail = requireText(studentEmail, "studentEmail");
@@ -37,10 +33,12 @@ public final class NotificationAggregate {
                 .studentEmail(validStudentEmail)
                 .channel(NotificationChannel.EMAIL)
                 .status(NotificationStatus.PENDING)
+                .title(subject)
+                .message(body)
                 .build();
     }
 
-    public NotificationLog createWebsiteLogFor(String studentId) {
+    public NotificationLog createWebsiteLogFor(String studentId, String subject, String body) {
         validatePolicy(policy);
         String validStudentId = requireText(studentId, "studentId");
 
@@ -49,6 +47,8 @@ public final class NotificationAggregate {
                 .studentId(validStudentId)
                 .channel(NotificationChannel.WEBSITE)
                 .status(NotificationStatus.UNREAD)
+                .title(subject)
+                .message(body)
                 .build();
     }
 

@@ -20,6 +20,56 @@ Event types to be seeded in `NotificationPolicy` (`event_type` column):
 | `OVERDUE_REMINDER`     | daily reminder while a loan is overdue       |
 | `RETURN_CONFIRMATION`  | book returned by student                     |
 
+## NotificationResponse shape
+
+All endpoints that return a notification log respond with this JSON shape:
+
+```json
+{
+  "id": 1,
+  "eventType": "BOOK_BORROWED",
+  "studentId": "a91940da-c7e0-477a-ba59-ca34756ced99",
+  "studentEmail": "phukak12345@gmail.com",
+  "channel": "WEBSITE",
+  "status": "UNREAD",
+  "subject": "Your loan is confirmed — Clean Code",
+  "body": "Hi, you have successfully borrowed \"Clean Code\". Due date: 2026-08-09.",
+  "createdAt": "2026-07-19T09:15:00",
+  "sentAt": null,
+  "readAt": null,
+  "failureReason": null
+}
+```
+
+| Field           | Type             | Description                                                                 |
+|-----------------|------------------|-----------------------------------------------------------------------------|
+| `id`            | `Integer`        | Primary key of the `notification_log` row.                                  |
+| `eventType`     | `String`         | One of `BOOK_BORROWED`, `DUE_SOON`, `OVERDUE_REMINDER`, `RETURN_CONFIRMATION`. |
+| `studentId`     | `String`         | Keycloak user UUID — matches the `sub` claim in the student's JWT.          |
+| `studentEmail`  | `String \| null` | Email address. `null` for `WEBSITE` channel rows.                           |
+| `channel`       | `String`         | `EMAIL` or `WEBSITE`.                                                       |
+| `status`        | `String`         | `PENDING`, `SENT`, `FAILED` for EMAIL; `UNREAD`, `READ` for WEBSITE.       |
+| `subject`       | `String`         | `NotificationPolicy.subject_template` rendered with this log's `templateVariables`, e.g. book title substituted in. Stored on the log at creation time so historical notifications keep their original wording even if the policy is edited later. |
+| `body`          | `String`         | `NotificationPolicy.body_template` rendered the same way as `subject`.      |
+| `createdAt`     | `LocalDateTime`  | When the `notification_log` row was created (i.e. when the triggering event happened). Distinct from `sentAt` (email delivery) and `readAt` (student read time) — this is the only timestamp `WEBSITE` rows have until they're read. |
+| `sentAt`        | `LocalDateTime \| null` | When the email was sent. `null` until delivery succeeds.             |
+| `readAt`        | `LocalDateTime \| null` | When the student marked the in-app notification as read.             |
+| `failureReason` | `String \| null` | Populated on `FAILED` email logs. `null` otherwise.                         |
+
+`GET /api/notifications/me` and `GET /api/notifications` return a paginated wrapper:
+
+```json
+{
+  "content": [ /* NotificationResponse[] */ ],
+  "totalElements": 5,
+  "totalPages": 1,
+  "size": 20,
+  "number": 0
+}
+```
+
+---
+
 ## High-level architecture
 
 ```

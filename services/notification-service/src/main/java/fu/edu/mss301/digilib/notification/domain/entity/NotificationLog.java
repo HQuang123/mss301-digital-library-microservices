@@ -38,6 +38,12 @@ public class NotificationLog {
     @Column(name = "status", length = 50, nullable = false)
     private NotificationStatus status;
 
+    @Column(name = "title", length = 255)
+    private String title;
+
+    @Column(name = "message", columnDefinition = "TEXT")
+    private String message;
+
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
 

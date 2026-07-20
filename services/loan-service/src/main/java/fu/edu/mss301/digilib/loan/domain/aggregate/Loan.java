@@ -35,10 +35,10 @@ public class Loan {
     @Column(name = "status", nullable = false, length = 30)
     private LoanStatus status;
 
-    @Column(name = "borrowed_at", nullable = false)
+    @Column(name = "borrowed_at")
     private LocalDateTime borrowedAt;
 
-    @Column(name = "due_date", nullable = false)
+    @Column(name = "due_date")
     private LocalDateTime dueDate;
 
     @Column(name = "returned_at")
@@ -58,6 +58,15 @@ public class Loan {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
+
+    @Column(name = "reviewed_by")
+    private String reviewedBy;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
 
     @Version
     private Long version;
@@ -108,6 +117,75 @@ public class Loan {
         return loan;
     }
 
+    public static Loan request(String memberId, Long bookId, String bookType, String idempotencyKey) {
+        if (memberId == null || memberId.isBlank())
+            throw new IllegalArgumentException("member required");
+        if (bookId == null)
+            throw new IllegalArgumentException("book required");
+        if (idempotencyKey == null || idempotencyKey.isBlank())
+            throw new IllegalArgumentException("idempotency key required");
+
+        LocalDateTime now = LocalDateTime.now();
+        Loan loan = new Loan();
+        loan.memberId = memberId;
+        loan.bookId = bookId;
+        loan.bookType = bookType == null || bookType.isBlank() ? "PHYSICAL" : bookType.toUpperCase();
+        loan.status = LoanStatus.PENDING;
+        loan.renewalCount = 0;
+        loan.maxRenewals = 3;
+        loan.idempotencyKey = idempotencyKey;
+        loan.createdAt = now;
+        loan.updatedAt = now;
+        loan.addHistory(null, LoanStatus.PENDING, memberId, "Borrow requested");
+        return loan;
+    }
+
+    public void approve(Long reservedCopyId, LocalDateTime approvedDueDate, String reviewerId) {
+        requirePending();
+        if (approvedDueDate == null || !approvedDueDate.isAfter(LocalDateTime.now()))
+            throw new IllegalArgumentException("due date must be in the future");
+        if (!"DIGITAL".equalsIgnoreCase(bookType) && reservedCopyId == null)
+            throw new IllegalArgumentException("physical book copy required");
+
+        LocalDateTime now = LocalDateTime.now();
+        LoanStatus previousStatus = status;
+        copyId = reservedCopyId;
+        status = LoanStatus.BORROWED;
+        borrowedAt = now;
+        dueDate = approvedDueDate;
+        reviewedAt = now;
+        reviewedBy = reviewerId;
+        updatedAt = now;
+        addHistory(previousStatus, status, reviewerId, "Borrow request approved");
+    }
+
+    public void reject(String reviewerId, String reason) {
+        requirePending();
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException("rejection reason required");
+        status = LoanStatus.REJECTED;
+        reviewedAt = LocalDateTime.now();
+        reviewedBy = reviewerId;
+        rejectionReason = reason.trim();
+        updatedAt = reviewedAt;
+        addHistory(LoanStatus.PENDING, status, reviewerId,
+                rejectionReason.substring(0, Math.min(rejectionReason.length(), 255)));
+    }
+
+    public void cancel(String memberId) {
+        requirePending();
+        status = LoanStatus.CANCELLED;
+        reviewedAt = LocalDateTime.now();
+        reviewedBy = memberId;
+        updatedAt = reviewedAt;
+        addHistory(LoanStatus.PENDING, status, memberId, "Borrow request cancelled");
+    }
+
+    private void requirePending() {
+        if (status != LoanStatus.PENDING)
+            throw new IllegalStateException("Borrow request is no longer pending");
+    }
+
     public void renew(String changedBy) {
 
         if (status != LoanStatus.BORROWED)
@@ -125,15 +203,25 @@ public class Loan {
 
     public void returnBook(String changedBy) {
 
-        if (status == LoanStatus.RETURNED)
+        if (status != LoanStatus.BORROWED && status != LoanStatus.OVERDUE)
             throw new IllegalStateException(
-                    "Book already returned");
+                    "Only an active or overdue loan can be returned");
 
         LoanStatus previousStatus = status;
         status = LoanStatus.RETURNED;
         returnedAt = LocalDateTime.now();
         updatedAt = returnedAt;
         addHistory(previousStatus, status, changedBy, "Book returned");
+    }
+
+    public void markLost(String changedBy) {
+        if (status != LoanStatus.BORROWED && status != LoanStatus.OVERDUE) {
+            throw new IllegalStateException("Only an active or overdue loan can be marked as lost");
+        }
+        LoanStatus previousStatus = status;
+        status = LoanStatus.LOST;
+        updatedAt = LocalDateTime.now();
+        addHistory(previousStatus, status, changedBy, "Book reported lost");
     }
 
     public void markOverdue() {

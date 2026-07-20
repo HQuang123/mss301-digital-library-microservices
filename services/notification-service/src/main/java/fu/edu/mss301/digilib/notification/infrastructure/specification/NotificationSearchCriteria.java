@@ -17,7 +17,7 @@ import java.util.List;
 public class NotificationSearchCriteria {
 
     private String eventType;
-    private Integer studentId;
+    private String studentId;
     private NotificationChannel channel;
     private NotificationStatus status;
     private LocalDateTime createdFrom;

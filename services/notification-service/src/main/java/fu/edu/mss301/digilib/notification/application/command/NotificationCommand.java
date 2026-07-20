@@ -10,7 +10,7 @@ import java.util.Map;
 public class NotificationCommand {
 
     private final String eventType;
-    private final Integer studentId;
+    private final String studentId;
     private final String studentEmail;
     private final Map<String, String> templateVariables;
 }

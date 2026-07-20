@@ -1,0 +1,47 @@
+name: CI - Notification Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - services/notification-service/**
+      - shared/common-web/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/_service-cd.yml
+      - .github/workflows/cicd-notification-service.yml
+  pull_request:
+    paths:
+      - services/notification-service/**
+      - shared/common-web/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/cicd-notification-service.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notification-service-ci:
+    uses: ./.github/workflows/_service-ci.yml
+    with:
+      module: services/notification-service
+      image_name: notification-service
+      ignore_test_failures: true
+    secrets: inherit
+
+  notification-service-cd:
+    needs: notification-service-ci
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_service-cd.yml
+    with:
+      service_name: notification-service
+      host_port: "8085"
+      container_port: "8085"
+    secrets: inherit

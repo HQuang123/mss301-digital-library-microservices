@@ -1,0 +1,70 @@
+name: Reusable service CI
+
+on:
+  workflow_call:
+    inputs:
+      module:
+        description: Maven module path to test and package
+        required: true
+        type: string
+      image_name:
+        description: Local Docker image name used by the build check
+        required: true
+        type: string
+      ignore_test_failures:
+        description: If true, run tests but don't fail the job when they fail
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: self-hosted
+    timeout-minutes: 30
+    environment:
+      name: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Ensure Maven is installed
+        run: |
+          command -v mvn || (sudo apt-get update && sudo apt-get install -y maven)
+
+      - name: Compute short commit SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+
+      # - name: Run module tests
+      #   continue-on-error: ${{ inputs.ignore_test_failures }}
+      #   run: >-
+      #     mvn --batch-mode --no-transfer-progress
+      #     -pl "${{ inputs.module }}" -am test
+
+      - name: Build service image
+        run: >-
+          docker build
+          --build-arg "MODULE=${{ inputs.module }}"
+          --tag "${{ secrets.DOCKER_USERNAME }}/${{ inputs.image_name }}:${{ env.SHORT_SHA }}"
+          --tag "${{ secrets.DOCKER_USERNAME }}/${{ inputs.image_name }}:latest"
+          .
+
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Push service image
+        if: github.event_name == 'push'
+        run: |
+          docker push "${{ secrets.DOCKER_USERNAME }}/${{ inputs.image_name }}:${{ env.SHORT_SHA }}"
+          docker push "${{ secrets.DOCKER_USERNAME }}/${{ inputs.image_name }}:latest"

@@ -10,5 +10,5 @@ public interface NotificationJpaRepository
         extends JpaRepository<NotificationLog, Integer>, JpaSpecificationExecutor<NotificationLog> {
 
     boolean existsByTemplate_EventTypeAndStudentIdAndCreateAtBetween(
-            String eventType, Integer studentId, LocalDateTime rangeStart, LocalDateTime rangeEnd);
+            String eventType, String studentId, LocalDateTime rangeStart, LocalDateTime rangeEnd);
 }

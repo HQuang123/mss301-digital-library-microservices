@@ -141,10 +141,8 @@ public class SepayPaymentService {
     }
 
     private String resolvePaymentCode(SepayWebhookRequest webhook) {
-        if (webhook.content() != null && !webhook.content().isBlank()) {
-            return webhook.content().trim();
-        }
-
+        // SePay's content is the full transfer description and can contain
+        // additional words. The normalized payment code is carried separately.
         return webhook.code().trim();
     }
 

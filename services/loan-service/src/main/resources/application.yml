@@ -1,10 +1,16 @@
 server:
-  address: ${INTERNAL_SERVICE_BIND_ADDRESS:127.0.0.1}
+  address: ${INTERNAL_SERVICE_BIND_ADDRESS:0.0.0.0}
   port: ${LOAN_SERVICE_PORT:8084}
 
 spring:
   application:
     name: loan-service
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${keycloak.issuer-uri}
 
   config:
     import:
@@ -12,7 +18,7 @@ spring:
       - "optional:file:.env[.properties]"
       # Supports Maven/module runs from services/loan-service.
       - "optional:file:../../.env[.properties]"
-      - "optional:configserver:http://localhost:8888"
+      - "${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}"
 
   datasource:
     url: ${LOAN_DB_URL:jdbc:postgresql://localhost:5432/loan_service_dbs}
@@ -20,20 +26,38 @@ spring:
     password: ${LOAN_DB_PASSWORD:123}
     driver-class-name: org.postgresql.Driver
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
     properties:
       hibernate:
         format_sql: true
 
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/digilib-realm}
+
 services:
   internal-api-key: ${INTERNAL_API_KEY}
   catalog:
     base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+    default-book-value: ${DEFAULT_BOOK_VALUE:250000}
   member:
     base-url: ${MEMBER_SERVICE_URL:http://localhost:8083}
+  fine:
+    base-url: ${FINE_SERVICE_URL:http://localhost:8086}
+  notification:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
+
+loan:
+  jobs:
+    overdue-fine-enabled: ${OVERDUE_FINE_JOB_ENABLED:true}
+    overdue-fine-cron: ${OVERDUE_FINE_JOB_CRON:0 15 2 * * *}
 
 eureka:
   instance:

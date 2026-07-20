@@ -1,0 +1,45 @@
+name: CI - API Gateway
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - infra/api-gateway/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/_service-cd.yml
+      - .github/workflows/cicd-api-gateway.yml
+  pull_request:
+    paths:
+      - infra/api-gateway/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/cicd-api-gateway.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-gateway-ci:
+    uses: ./.github/workflows/_service-ci.yml
+    with:
+      module: infra/api-gateway
+      image_name: api-gateway
+      ignore_test_failures: true
+    secrets: inherit
+
+  api-gateway-cd:
+    needs: api-gateway-ci
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_service-cd.yml
+    with:
+      service_name: api-gateway
+      host_port: "8080"
+      container_port: "8080"
+    secrets: inherit

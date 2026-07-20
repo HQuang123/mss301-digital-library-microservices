@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 public record LoanDueDto(
         Long loanId,
-        Integer studentId,
+        String studentId,
         String studentEmail,
         String bookTitle,
         LocalDateTime dueDate) {

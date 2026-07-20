@@ -13,11 +13,62 @@ the existing domain model:
 
 Event types to be seeded in `NotificationPolicy` (`event_type` column):
 
-| Event type            | Scenario                                   |
-|------------------------|---------------------------------------------|
-| `DUE_SOON`             | 3 days before due date                      |
+| Event type            | Scenario                                    |
+|------------------------|----------------------------------------------|
+| `BOOK_BORROWED`        | student borrows a book successfully          |
+| `DUE_SOON`             | 3 days before due date                       |
 | `OVERDUE_REMINDER`     | daily reminder while a loan is overdue       |
-| `RETURN_CONFIRMATION`  | book returned by student                    |
+| `RETURN_CONFIRMATION`  | book returned by student                     |
+
+## NotificationResponse shape
+
+All endpoints that return a notification log respond with this JSON shape:
+
+```json
+{
+  "id": 1,
+  "eventType": "BOOK_BORROWED",
+  "studentId": "a91940da-c7e0-477a-ba59-ca34756ced99",
+  "studentEmail": "phukak12345@gmail.com",
+  "channel": "WEBSITE",
+  "status": "UNREAD",
+  "subject": "Your loan is confirmed — Clean Code",
+  "body": "Hi, you have successfully borrowed \"Clean Code\". Due date: 2026-08-09.",
+  "createdAt": "2026-07-19T09:15:00",
+  "sentAt": null,
+  "readAt": null,
+  "failureReason": null
+}
+```
+
+| Field           | Type             | Description                                                                 |
+|-----------------|------------------|-----------------------------------------------------------------------------|
+| `id`            | `Integer`        | Primary key of the `notification_log` row.                                  |
+| `eventType`     | `String`         | One of `BOOK_BORROWED`, `DUE_SOON`, `OVERDUE_REMINDER`, `RETURN_CONFIRMATION`. |
+| `studentId`     | `String`         | Keycloak user UUID — matches the `sub` claim in the student's JWT.          |
+| `studentEmail`  | `String \| null` | Email address. `null` for `WEBSITE` channel rows.                           |
+| `channel`       | `String`         | `EMAIL` or `WEBSITE`.                                                       |
+| `status`        | `String`         | `PENDING`, `SENT`, `FAILED` for EMAIL; `UNREAD`, `READ` for WEBSITE.       |
+| `subject`       | `String`         | `NotificationPolicy.subject_template` rendered with this log's `templateVariables`, e.g. book title substituted in. Stored on the log at creation time so historical notifications keep their original wording even if the policy is edited later. |
+| `body`          | `String`         | `NotificationPolicy.body_template` rendered the same way as `subject`.      |
+| `createdAt`     | `LocalDateTime`  | When the `notification_log` row was created (i.e. when the triggering event happened). Distinct from `sentAt` (email delivery) and `readAt` (student read time) — this is the only timestamp `WEBSITE` rows have until they're read. |
+| `sentAt`        | `LocalDateTime \| null` | When the email was sent. `null` until delivery succeeds.             |
+| `readAt`        | `LocalDateTime \| null` | When the student marked the in-app notification as read.             |
+| `failureReason` | `String \| null` | Populated on `FAILED` email logs. `null` otherwise.                         |
+
+`GET /api/notifications/me` and `GET /api/notifications` return a paginated wrapper:
+
+```json
+{
+  "content": [ /* NotificationResponse[] */ ],
+  "totalElements": 5,
+  "totalPages": 1,
+  "size": 20,
+  "number": 0
+}
+```
+
+---
 
 ## High-level architecture
 
@@ -40,7 +91,46 @@ Scenario (a) and (b) below are naturally scheduled/pull-based since they depend 
 
 ---
 
-## a. Reminder — 3 days before due date
+## a. Book borrowed — in-app notification
+
+**Trigger:** `NotificationController` REST endpoint, called by loan-service synchronously right after the borrow saga completes successfully.
+
+```
+POST /api/notifications
+{
+  "eventType": "BOOK_BORROWED",
+  "studentId": 123,
+  "studentEmail": "student@fu.edu.vn",
+  "templateVariables": {
+    "bookTitle": "Clean Code",
+    "dueDate": "2026-08-09"
+  }
+}
+```
+
+1. loan-service calls this endpoint inside its borrow saga completion step.
+2. `CreateNewNotificationUseCase` loads active `NotificationPolicy` where `eventType = BOOK_BORROWED`.
+3. `NotificationAggregate.create(policy)`:
+   - `createWebsiteLogFor(studentId)` → persist as `UNREAD` (drives the in-app badge/bell).
+   - `createEmailLogFor(studentId, studentEmail)` → persist as `PENDING`, then send a borrow confirmation email.
+4. Returns `NotificationResponse` (log ids + statuses) to loan-service — loan-service ignores the response body but checks for 2xx to confirm delivery was attempted.
+
+**UI flow:** the frontend polls or subscribes to `GET /api/notifications/me?status=UNREAD` after a successful borrow. When the new `UNREAD` row appears, the notification bell badge increments. The student clicks the notification → frontend calls `PATCH /api/notifications/{id}/read` → status transitions to `READ`, `readAt` is stamped.
+
+**Idempotency:** use the loan's idempotency key (passed as a `templateVariable`) to guard against duplicate rows if loan-service retries the call. Check for an existing `NotificationLog` with the same `policy + studentId + loanIdempotencyKey` before creating.
+
+**Policy seed entry required:**
+
+| field             | value                                                                      |
+|-------------------|----------------------------------------------------------------------------|
+| `event_type`      | `BOOK_BORROWED`                                                            |
+| `subject_template`| `Your loan is confirmed — {{bookTitle}}`                                   |
+| `body_template`   | `Hi, you have successfully borrowed "{{bookTitle}}". Due date: {{dueDate}}.` |
+| `is_active`       | `true`                                                                     |
+
+---
+
+## b. Reminder — 3 days before due date
 
 **Trigger:** scheduled job (e.g. daily at 07:00), not the controller — there is no user action that causes "3 days before due" to happen.
 
@@ -96,12 +186,60 @@ POST /api/notifications/return-confirmation
 
 ---
 
+## d. Mark notification as read
+
+**Trigger:** student clicks a notification in the UI.
+
+```
+PATCH /api/notifications/{id}/read
+Authorization: Bearer <student JWT>
+```
+
+1. Gateway forwards the request with the JWT. Notification-service extracts `studentId` from the JWT subject (or a custom claim) to verify ownership — a student must not be able to mark another student's notification as read.
+2. Load `NotificationLog` by `id`. If not found → 404. If `log.studentId ≠ jwtStudentId` → 403.
+3. If `log.channel ≠ WEBSITE` → 400 (only in-app notifications are "read"; EMAIL logs do not have a read state meaningful to the student).
+4. If `log.status = READ` already → return 200 with the existing log (idempotent, no-op).
+5. `NotificationAggregate.markRead(log)` → set `status = READ`, `readAt = now()`, persist.
+6. Return updated `NotificationResponse`.
+
+**New use case:** `MarkNotificationReadUseCase` — keeps the read transition out of the controller.
+
+---
+
+## e. Get my notifications
+
+**Trigger:** frontend loads the notification bell / notification list for the logged-in student.
+
+```
+GET /api/notifications/me?status=UNREAD&page=0&size=20
+Authorization: Bearer <student JWT>
+```
+
+1. Extract `studentId` from JWT (same claim used in the borrow/return flows).
+2. Query `NotificationLog` where `studentId = :studentId AND channel = WEBSITE` (only in-app rows are surfaced to the student; EMAIL rows are delivery receipts, not user-visible). Optionally filter by `status` if provided.
+3. Return paginated `NotificationResponse` sorted by `createAt DESC`.
+4. The unread count for the bell badge can be derived from `status = UNREAD` rows in the same response — no separate count endpoint needed.
+
+**Gateway security:** this endpoint is accessible to any authenticated user (student, librarian, admin) — each sees only their own data because the filter is on `studentId` from the JWT, not from the request body.
+
+**New repository method:** `Page<NotificationLog> findByStudentIdAndChannel(String studentId, NotificationChannel channel, Pageable pageable)` with an optional `status` filter.
+
+---
+
 ## Shared pieces to implement
 
-- `NotificationController` — REST endpoints for (c) and any manual/admin trigger of (a)/(b) for testing.
-- `NotificationCreateRequest` / `NotificationResponse` DTOs.
+- `NotificationEventType` — add `BOOK_BORROWED` to the enum.
+- `NotificationController` — add:
+  - `PATCH /api/notifications/{id}/read` (scenario d)
+  - `GET /api/notifications/me` (scenario e)
+  - existing `POST /api/notifications` already covers scenario a (book borrowed) once the policy is seeded.
+- `MarkNotificationReadUseCase` — load log → verify ownership → `NotificationAggregate.markRead` → persist.
+- `NotificationCreateRequest` / `NotificationResponse` DTOs — `NotificationResponse` needs `readAt` surfaced.
 - `CreateNewNotificationUseCase` — orchestrates: load policy → `NotificationAggregate` → persist log(s) → send email → mark sent/failed.
-- `NotificationRepository` (+ JPA adapter, already scaffolded as `NotificationRepositoryAdapter` / `NotificationJpaRepository`) — needs `existsBy...` methods for dedup checks in (a)/(b).
-- `LoanServiceClient` — OpenFeign client to loan-service for `getLoansDueOn(date)` and `getOverdueLoans()` (pom.xml already includes `spring-cloud-starter-openfeign` + Eureka client).
-- `MailSenderService` wrapping `JavaMailSender`, rendering `subjectTemplate` / `bodyTemplate` with loan/student variables.
-- Two `@Scheduled` job beans (`DueDateReminderJob`, `OverdueReminderJob`) with cron expressions externalized to config (config-server `application.yml`), so schedules can change without a redeploy.
+- `NotificationRepository` (+ JPA adapter) — needs:
+  - `existsBy...` for dedup (scenarios b, c).
+  - `Page<NotificationLog> findByStudentIdAndChannel(...)` for scenario e.
+- `LoanServiceClient` — OpenFeign client to loan-service for `getLoansDueOn(date)` and `getOverdueLoans()`.
+- `MailSenderService` wrapping `JavaMailSender`, rendering `subjectTemplate` / `bodyTemplate` with template variables.
+- Two `@Scheduled` job beans (`DueDateReminderJob`, `OverdueReminderJob`) with cron expressions externalized to config-server.
+- **DB migration** — add `BOOK_BORROWED` policy row to the seed migration (or a new `V_next` migration if the table already exists in production).

@@ -38,7 +38,7 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
 
     @Override
     public boolean existsByEventTypeAndStudentIdAndCreateAtBetween(
-            String eventType, Integer studentId, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
+            String eventType, String studentId, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
         return notificationJpaRepository.existsByTemplate_EventTypeAndStudentIdAndCreateAtBetween(
                 eventType, studentId, rangeStart, rangeEnd);
     }

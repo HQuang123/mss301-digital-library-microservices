@@ -22,13 +22,9 @@ public final class NotificationAggregate {
         return new NotificationAggregate(policy);
     }
 
-    public NotificationLog createLogFor(Integer studentId, String studentEmail) {
-        return createEmailLogFor(studentId, studentEmail);
-    }
-
-    public NotificationLog createEmailLogFor(Integer studentId, String studentEmail) {
+    public NotificationLog createEmailLogFor(String studentId, String studentEmail, String subject, String body) {
         validatePolicy(policy);
-        Integer validStudentId = requirePositive(studentId, "studentId");
+        String validStudentId = requireText(studentId, "studentId");
         String validStudentEmail = requireText(studentEmail, "studentEmail");
 
         return NotificationLog.builder()
@@ -37,18 +33,22 @@ public final class NotificationAggregate {
                 .studentEmail(validStudentEmail)
                 .channel(NotificationChannel.EMAIL)
                 .status(NotificationStatus.PENDING)
+                .title(subject)
+                .message(body)
                 .build();
     }
 
-    public NotificationLog createWebsiteLogFor(Integer studentId) {
+    public NotificationLog createWebsiteLogFor(String studentId, String subject, String body) {
         validatePolicy(policy);
-        Integer validStudentId = requirePositive(studentId, "studentId");
+        String validStudentId = requireText(studentId, "studentId");
 
         return NotificationLog.builder()
                 .template(policy)
                 .studentId(validStudentId)
                 .channel(NotificationChannel.WEBSITE)
                 .status(NotificationStatus.UNREAD)
+                .title(subject)
+                .message(body)
                 .build();
     }
 
@@ -165,14 +165,6 @@ public final class NotificationAggregate {
         if (!Boolean.TRUE.equals(policy.getIsActive())) {
             throw new IllegalStateException("notificationPolicy must be active");
         }
-    }
-
-    private static Integer requirePositive(Integer value, String fieldName) {
-        if (value == null || value <= 0) {
-            throw new IllegalArgumentException(fieldName + " must be positive");
-        }
-
-        return value;
     }
 
     private static String requireText(String value, String fieldName) {

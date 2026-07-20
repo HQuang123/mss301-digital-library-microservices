@@ -1,0 +1,45 @@
+name: CI - Eureka Server
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - infra/eureka-server/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/_service-cd.yml
+      - .github/workflows/cicd-eureka-server.yml
+  pull_request:
+    paths:
+      - infra/eureka-server/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/cicd-eureka-server.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eureka-server-ci:
+    uses: ./.github/workflows/_service-ci.yml
+    with:
+      module: infra/eureka-server
+      image_name: eureka-server
+      ignore_test_failures: true
+    secrets: inherit
+
+  eureka-server-cd:
+    needs: eureka-server-ci
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_service-cd.yml
+    with:
+      service_name: eureka-server
+      host_port: "8761"
+      container_port: "8761"
+    secrets: inherit

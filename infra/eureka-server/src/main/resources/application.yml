@@ -1,5 +1,5 @@
 server:
-  address: ${INFRA_BIND_ADDRESS:127.0.0.1}
+  address: ${INFRA_BIND_ADDRESS:0.0.0.0}
   port: 8761
 
 spring:
@@ -8,7 +8,7 @@ spring:
 
 eureka:
   instance:
-    hostname: localhost
+    hostname: ${EUREKA_HOSTNAME:localhost}
   client:
     register-with-eureka: false
     fetch-registry: false

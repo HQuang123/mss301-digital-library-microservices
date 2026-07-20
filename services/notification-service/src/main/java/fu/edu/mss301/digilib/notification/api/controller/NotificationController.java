@@ -7,6 +7,7 @@ import fu.edu.mss301.digilib.notification.application.command.NotificationComman
 import fu.edu.mss301.digilib.notification.application.scheduler.DueSoonReminderJob;
 import fu.edu.mss301.digilib.notification.application.scheduler.OverdueReminderJob;
 import fu.edu.mss301.digilib.notification.application.usecase.CreateNewNotificationUseCase;
+import fu.edu.mss301.digilib.notification.application.usecase.MarkNotificationReadUseCase;
 import fu.edu.mss301.digilib.notification.domain.entity.NotificationLog;
 import fu.edu.mss301.digilib.notification.domain.vo.NotificationChannel;
 import fu.edu.mss301.digilib.notification.domain.vo.NotificationEventType;
@@ -19,6 +20,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -31,6 +34,7 @@ import java.util.Map;
 public class NotificationController {
 
     private final CreateNewNotificationUseCase createNewNotificationUseCase;
+    private final MarkNotificationReadUseCase markNotificationReadUseCase;
     private final NotificationRepository notificationRepository;
     private final DueSoonReminderJob dueSoonReminderJob;
     private final OverdueReminderJob overdueReminderJob;
@@ -76,10 +80,35 @@ public class NotificationController {
         return ResponseEntity.accepted().build();
     }
 
+    @PatchMapping("/{id}/read")
+    public ResponseEntity<NotificationResponse> markAsRead(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal Jwt jwt) {
+        NotificationLog log = markNotificationReadUseCase.execute(id, jwt.getSubject());
+        return ResponseEntity.ok(NotificationResponse.from(log));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<Page<NotificationResponse>> getMyNotifications(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) NotificationStatus status,
+            Pageable pageable) {
+        NotificationSearchCriteria criteria = NotificationSearchCriteria.builder()
+                .studentId(jwt.getSubject())
+                .channel(NotificationChannel.WEBSITE)
+                .status(status)
+                .build();
+
+        Page<NotificationResponse> page = notificationRepository.search(criteria, pageable)
+                .map(NotificationResponse::from);
+
+        return ResponseEntity.ok(page);
+    }
+
     @GetMapping
     public ResponseEntity<Page<NotificationResponse>> search(
             @RequestParam(required = false) String eventType,
-            @RequestParam(required = false) Integer studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam(required = false) NotificationChannel channel,
             @RequestParam(required = false) NotificationStatus status,
             Pageable pageable) {

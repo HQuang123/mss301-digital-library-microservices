@@ -1,0 +1,47 @@
+name: CI - Catalog Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - services/catalog-service/**
+      - shared/common-web/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/_service-cd.yml
+      - .github/workflows/cicd-catalog-service.yml
+  pull_request:
+    paths:
+      - services/catalog-service/**
+      - shared/common-web/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/cicd-catalog-service.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-service-ci:
+    uses: ./.github/workflows/_service-ci.yml
+    with:
+      module: services/catalog-service
+      image_name: catalog-service
+      ignore_test_failures: true
+    secrets: inherit
+
+  catalog-service-cd:
+    needs: catalog-service-ci
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_service-cd.yml
+    with:
+      service_name: catalog-service
+      host_port: "8081"
+      container_port: "8081"
+    secrets: inherit

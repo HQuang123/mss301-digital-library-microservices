@@ -1,6 +1,9 @@
 server:
-  address: ${INTERNAL_SERVICE_BIND_ADDRESS:127.0.0.1}
+  address: ${INTERNAL_SERVICE_BIND_ADDRESS:0.0.0.0}
   port: ${NOTIFICATION_SERVICE_PORT:8085}
+
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/digilib-realm}
 
 spring:
   application:
@@ -12,9 +15,20 @@ spring:
     password: ${NOTIFICATION_DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${keycloak.issuer-uri}
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -35,11 +49,11 @@ spring:
 
 eureka:
   instance:
-    hostname: ${INTERNAL_SERVICE_HOST:localhost}
+    hostname: ${INTERNAL_SERVICE_HOST:notification-service}
     prefer-ip-address: false
   client:
     service-url:
-      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}
+      defaultZone: ${EUREKA_URI:http://eureka-server:8761/eureka/}
 
 notification:
   jobs:

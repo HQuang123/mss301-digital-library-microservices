@@ -25,7 +25,7 @@ public class NotificationLog {
     private NotificationPolicy template;
 
     @Column(name = "student_id", nullable = false)
-    private Integer studentId;
+    private String studentId;
 
     @Column(name = "student_email", length = 255)
     private String studentEmail;
@@ -37,6 +37,12 @@ public class NotificationLog {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50, nullable = false)
     private NotificationStatus status;
+
+    @Column(name = "title", length = 255)
+    private String title;
+
+    @Column(name = "message", columnDefinition = "TEXT")
+    private String message;
 
     @Column(name = "sent_at")
     private LocalDateTime sentAt;

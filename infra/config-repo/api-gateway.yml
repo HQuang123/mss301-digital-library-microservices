@@ -140,6 +140,28 @@ spring:
                       maxBackoff: 500ms
                       factor: 2
                       basedOnPreviousValue: false
+
+            - id: notification-service
+              uri: lb://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/api/notifications/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: notificationCircuitBreaker
+                    fallbackUri: forward:/fallback/notification
+                    statusCodes: INTERNAL_SERVER_ERROR,BAD_GATEWAY,SERVICE_UNAVAILABLE,GATEWAY_TIMEOUT
+                - name: Retry
+                  args:
+                    retries: 2
+                    statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE,GATEWAY_TIMEOUT
+                    methods: GET
+                    exceptions: java.io.IOException,java.util.concurrent.TimeoutException,io.netty.handler.timeout.ReadTimeoutException
+                    backoff:
+                      firstBackoff: 100ms
+                      maxBackoff: 500ms
+                      factor: 2
+                      basedOnPreviousValue: false
   
 management:
   endpoint:
@@ -181,6 +203,8 @@ resilience4j:
         baseConfig: default
       fineCircuitBreaker:
         baseConfig: default
+      notificationCircuitBreaker:
+        baseConfig: default
   circuitbreaker:
     configs:
       default:
@@ -204,6 +228,8 @@ resilience4j:
         baseConfig: default
       fineCircuitBreaker:
         baseConfig: default
+      notificationCircuitBreaker:
+        baseConfig: default
   timelimiter:
     configs:
       default:
@@ -224,17 +250,19 @@ resilience4j:
         baseConfig: default
       fineCircuitBreaker:
         baseConfig: default
+      notificationCircuitBreaker:
+        baseConfig: default
 
 eureka:
   instance:
     prefer-ip-address: true
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URI:http://eureka-server:8761/eureka/}
 
 keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/digilib-realm}
 
 gateway:
   cors:
-    allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173}
+    allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,http://huynq.space,https://huynq.space}

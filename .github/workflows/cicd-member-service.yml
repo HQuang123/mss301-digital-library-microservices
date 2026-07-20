@@ -1,0 +1,45 @@
+name: CI - Member Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - services/member-service/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/_service-cd.yml
+      - .github/workflows/cicd-member-service.yml
+  pull_request:
+    paths:
+      - services/member-service/**
+      - pom.xml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/_service-ci.yml
+      - .github/workflows/cicd-member-service.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  member-service-ci:
+    uses: ./.github/workflows/_service-ci.yml
+    with:
+      module: services/member-service
+      image_name: member-service
+      ignore_test_failures: true
+    secrets: inherit
+
+  member-service-cd:
+    needs: member-service-ci
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_service-cd.yml
+    with:
+      service_name: member-service
+      host_port: "8082"
+      container_port: "8082"
+    secrets: inherit

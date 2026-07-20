@@ -1,5 +1,5 @@
 server:
-  address: ${INFRA_BIND_ADDRESS:127.0.0.1}
+  address: ${INFRA_BIND_ADDRESS:0.0.0.0}
   port: 8888
 
 spring:
@@ -18,6 +18,10 @@ spring:
           search-paths: infra/config-repo
 
 eureka:
+  instance:
+    hostname: ${INTERNAL_SERVICE_HOST:localhost}
+    prefer-ip-address: false
   client:
+    enabled: ${EUREKA_ENABLED:true}
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}

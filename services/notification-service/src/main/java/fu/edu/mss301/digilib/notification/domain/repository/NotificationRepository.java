@@ -18,7 +18,7 @@ public interface NotificationRepository {
     Optional<NotificationLog> findById(Integer id);
 
     boolean existsByEventTypeAndStudentIdAndCreateAtBetween(
-            String eventType, Integer studentId, LocalDateTime rangeStart, LocalDateTime rangeEnd);
+            String eventType, String studentId, LocalDateTime rangeStart, LocalDateTime rangeEnd);
 
     Page<NotificationLog> search(NotificationSearchCriteria criteria, Pageable pageable);
 }

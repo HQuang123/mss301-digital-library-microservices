@@ -13,12 +13,25 @@ import reactor.core.publisher.Mono;
 @Component
 public class InternalEndpointBlockFilter implements GlobalFilter, Ordered {
 
+    private static final PathPatternParser PARSER = new PathPatternParser();
     private static final PathPattern INTERNAL_MEMBER_PATH =
-            new PathPatternParser().parse("/api/v1/members/internal/**");
+            PARSER.parse("/api/v1/members/internal/**");
+    private static final PathPattern NOTIFICATION_CREATE_PATH =
+            PARSER.parse("/api/notifications");
+    private static final PathPattern NOTIFICATION_RETURN_CONFIRMATION_PATH =
+            PARSER.parse("/api/notifications/return-confirmation");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        if (!INTERNAL_MEMBER_PATH.matches(exchange.getRequest().getPath().pathWithinApplication())) {
+        var path = exchange.getRequest().getPath().pathWithinApplication();
+        var method = exchange.getRequest().getMethod();
+
+        boolean blocked = INTERNAL_MEMBER_PATH.matches(path)
+                || (org.springframework.http.HttpMethod.POST.equals(method)
+                    && (NOTIFICATION_CREATE_PATH.matches(path)
+                        || NOTIFICATION_RETURN_CONFIRMATION_PATH.matches(path)));
+
+        if (!blocked) {
             return chain.filter(exchange);
         }
 

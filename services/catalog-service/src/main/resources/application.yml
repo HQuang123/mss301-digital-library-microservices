@@ -1,5 +1,5 @@
 server:
-  address: ${INTERNAL_SERVICE_BIND_ADDRESS:127.0.0.1}
+  address: ${INTERNAL_SERVICE_BIND_ADDRESS:0.0.0.0}
   port: ${CATALOG_SERVICE_PORT:8082}
 
 spring:
@@ -7,7 +7,9 @@ spring:
     name: catalog-service
 
   config:
-    import: "optional:configserver:http://localhost:8888"
+    import:
+      - "optional:file:.env[.properties]"
+      - "${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}"
 
   datasource:
     url: ${CATALOG_DB_URL:jdbc:postgresql://localhost:5432/catalog_service_dbs}
@@ -34,7 +36,7 @@ spring:
       max-request-size: 25MB
 
 catalog:
-  upload-dir: uploads/catalog
+  upload-dir: uploads/files
 
 eureka:
   instance:

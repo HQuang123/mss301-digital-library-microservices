@@ -7,7 +7,7 @@ spring:
       - "optional:file:.env[.properties]"
       # Supports Maven/module runs from services/member-service.
       - "optional:file:../../.env[.properties]"
-      - "optional:configserver:http://localhost:8888"
+      - "${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}"
 
   # Reactive Database Setup via R2DBC
   r2dbc:
@@ -56,5 +56,5 @@ services:
 server:
   # Local Java processes are reachable through the gateway only. Container
   # deployments must override this to 0.0.0.0 and keep the port un-published.
-  address: ${INTERNAL_SERVICE_BIND_ADDRESS:127.0.0.1}
+  address: ${INTERNAL_SERVICE_BIND_ADDRESS:0.0.0.0}
   port: ${MEMBER_SERVICE_PORT:8083}

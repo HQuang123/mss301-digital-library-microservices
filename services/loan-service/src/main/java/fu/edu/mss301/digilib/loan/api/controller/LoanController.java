@@ -21,6 +21,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LoanController {
 
+    private static final String AUTHENTICATED_USER_HEADER = "X-Authenticated-User-Id";
+
     private final BorrowBookUseCase borrowBookUseCase;
     private final ManageLoanUseCase manageLoanUseCase;
 
@@ -61,7 +63,12 @@ public class LoanController {
     }
 
     @GetMapping("/loans/my-loans")
-    public List<LoanResponse> findByMember(@RequestParam String memberId) {
+    public List<LoanResponse> findMine(@RequestHeader(AUTHENTICATED_USER_HEADER) String memberId) {
+        return manageLoanUseCase.findByMember(memberId).stream().map(LoanResponse::from).toList();
+    }
+
+    @GetMapping("/loans/member/{memberId}")
+    public List<LoanResponse> findByMember(@PathVariable String memberId) {
         return manageLoanUseCase.findByMember(memberId).stream().map(LoanResponse::from).toList();
     }
 }

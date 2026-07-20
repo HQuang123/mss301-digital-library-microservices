@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GatewayResilienceConfigurationTests {
 
     private static final Set<String> RETRIED_ROUTES =
-            Set.of("catalog-service", "loan-service", "member-service", "fine-service");
+            Set.of("catalog-service", "loan-service", "member-service", "fine-service", "notification-service");
 
     @Autowired
     private RouteDefinitionLocator routeDefinitionLocator;
@@ -63,7 +63,8 @@ class GatewayResilienceConfigurationTests {
                 "loan-service",
                 "member-auth",
                 "member-service",
-                "fine-service");
+                "fine-service",
+                "notification-service");
         assertThat(routeIds).doesNotContain("catalog-bulkhead-demo");
     }
 
@@ -82,7 +83,8 @@ class GatewayResilienceConfigurationTests {
                 "loan-service",
                 "member-auth",
                 "member-service",
-                "fine-service");
+                "fine-service",
+                "notification-service");
         assertThat(breakerNames).hasSameSizeAs(routes.values()).doesNotContainNull();
         assertThat(breakerNames).allSatisfy(name -> {
             assertThat(circuitBreakerRegistry.find(name)).isPresent();

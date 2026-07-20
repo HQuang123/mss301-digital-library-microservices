@@ -5,6 +5,7 @@
 Loan Service đã được hoàn thiện ở mức MVP để quản lý vòng đời mượn sách trong hệ thống Digital Library. Phần đã làm bao gồm:
 
 - Mượn sách vật lý hoặc sách số.
+- Tạo, duyệt, từ chối và hủy yêu cầu mượn trước khi phát sinh Loan.
 - Trả sách.
 - Gia hạn khoản mượn.
 - Tra cứu một khoản mượn, toàn bộ khoản mượn và lịch sử theo thành viên.
@@ -30,6 +31,7 @@ Các model nghiệp vụ chính:
 - `SagaOutbox`: lưu các sự kiện cần phát ra message broker.
 - `SagaLog`: nền tảng theo dõi các bước xử lý saga.
 - `Reservation`: nền tảng cho chức năng đặt trước trong giai đoạn tiếp theo.
+- `BorrowRequest`: hàng đợi xét duyệt; chỉ khi được duyệt mới gọi luồng tạo `Loan`.
 
 ## 3. Business rule đã áp dụng
 
@@ -63,28 +65,49 @@ Các model nghiệp vụ chính:
 3. Mỗi lần gia hạn cộng thêm 14 ngày vào hạn trả.
 4. Hệ thống tăng `renewalCount`, lưu lịch sử và tạo `LoanRenewedEvent`.
 
+### 3.4. Khi xử lý yêu cầu mượn
+
+1. Người dùng đã xác thực tạo `BorrowRequest` ở trạng thái `PENDING`.
+2. Gateway xóa identity header do client tự gửi và tạo lại từ claim `sub` của JWT.
+3. Một thành viên không thể có hai request `PENDING` cho cùng một sách.
+4. Chỉ `ADMIN` hoặc `LIBRARIAN` được xem hàng đợi, duyệt hoặc từ chối.
+5. Khi duyệt, hệ thống gọi lại toàn bộ luồng mượn tại mục 3.1; vì vậy Fine, hạn mức Member và bản sao Catalog vẫn được kiểm tra tại thời điểm duyệt.
+6. Thành viên chỉ được hủy request `PENDING` của chính mình.
+7. Sau khi duyệt, response request phản ánh trạng thái hiện tại của Loan (`BORROWED`, `OVERDUE`, `RETURNED` hoặc `LOST`).
+
 ## 4. API đã hoàn thiện
 
-Base URL khi gọi trực tiếp Loan Service:
+Base URL qua API Gateway:
 
 ```text
-http://localhost:8084/api/loan
+http://localhost:8080
 ```
 
-Nếu chạy qua API Gateway và Eureka:
+Khi gọi trực tiếp Loan Service, port mặc định không Config Server là `8084`; cấu hình full microservices hiện cấp port `8083`.
 
-```text
-http://localhost:8080/api/loan
-```
+### Loan API
 
 | Method | Endpoint | Chức năng |
 | --- | --- | --- |
-| `POST` | `/api/loan` | Mượn sách |
-| `POST` | `/api/loan/{loanId}/return` | Trả sách |
-| `POST` | `/api/loan/{loanId}/renew` | Gia hạn |
-| `GET` | `/api/loan/{loanId}` | Xem chi tiết loan |
-| `GET` | `/api/loan?page=0&size=20` | Xem danh sách có phân trang |
-| `GET` | `/api/loan/member/{memberId}` | Xem lịch sử theo thành viên |
+| `POST` | `/api/v1/rent-books` | Tạo Loan trực tiếp; dành cho luồng nội bộ/nhân viên |
+| `POST` | `/api/v1/loans/return` | Trả sách |
+| `PUT` | `/api/v1/loans/{loanId}/renew` | Gia hạn |
+| `POST` | `/api/v1/loans/{loanId}/lost` | Báo mất |
+| `GET` | `/api/v1/loans/{loanId}` | Xem chi tiết Loan |
+| `GET` | `/api/v1/loans?page=0&size=20` | Xem danh sách có phân trang |
+| `GET` | `/api/v1/loans/my-loans` | Xem Loan của tài khoản đăng nhập |
+| `GET` | `/api/v1/loans/member/{memberId}` | Xem lịch sử theo thành viên |
+
+### Borrow Request API
+
+| Method | Endpoint | Quyền | Chức năng |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/borrow-requests` | Authenticated | Tạo request `PENDING` |
+| `GET` | `/api/v1/borrow-requests/me?page=0&size=20` | Authenticated | Xem request của bản thân |
+| `DELETE` | `/api/v1/borrow-requests/{requestId}` | Owner | Hủy request `PENDING` |
+| `GET` | `/api/v1/borrow-requests?status=PENDING` | Admin/Librarian | Xem hàng đợi theo trạng thái |
+| `POST` | `/api/v1/borrow-requests/{requestId}/approve` | Admin/Librarian | Duyệt và tạo Loan `BORROWED` |
+| `POST` | `/api/v1/borrow-requests/{requestId}/reject` | Admin/Librarian | Từ chối request |
 
 ### Request mượn sách vật lý
 
@@ -98,6 +121,26 @@ http://localhost:8080/api/loan
 ```
 
 Mỗi lần muốn tạo một loan mới phải đổi `idempotencyKey`.
+
+### Request tạo yêu cầu mượn
+
+`memberId` không nằm trong body vì được Gateway lấy từ JWT:
+
+```json
+{
+  "bookId": 1,
+  "bookType": "PHYSICAL",
+  "idempotencyKey": "loan-request-1-001"
+}
+```
+
+### Request từ chối yêu cầu
+
+```json
+{
+  "reason": "Thành viên chưa đủ điều kiện mượn"
+}
+```
 
 ### Request trả sách
 

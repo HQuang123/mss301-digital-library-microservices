@@ -96,6 +96,33 @@ class GatewaySecurityIntegrationTests {
     }
 
     @Test
+    void rejectsBorrowRequestQueueForRegularMembers() {
+        webTestClient.mutateWith(mockJwt()
+                        .jwt(jwt -> jwt.subject("member-1"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                .get()
+                .uri("/api/v1/borrow-requests?status=PENDING")
+                .exchange()
+                .expectStatus().isForbidden()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("ACCESS_DENIED");
+    }
+
+    @Test
+    void allowsBorrowRequestQueueForLibrarians() {
+        webTestClient.mutateWith(mockJwt()
+                        .jwt(jwt -> jwt.subject("librarian-1"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_LIBRARIAN")))
+                .get()
+                .uri("/api/v1/borrow-requests?status=PENDING")
+                .exchange()
+                .expectStatus().value(status ->
+                        assertThat(status).isNotIn(
+                                HttpStatus.UNAUTHORIZED.value(),
+                                HttpStatus.FORBIDDEN.value()));
+    }
+
+    @Test
     void rejectsOperationalActuatorEndpointsForNonAdminUsers() {
         webTestClient.mutateWith(mockJwt()
                         .jwt(jwt -> jwt.subject("member-1"))

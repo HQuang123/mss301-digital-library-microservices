@@ -5,7 +5,6 @@ on:
     inputs:
       service_name:
         description: Service name — used as container name and image name
-        description: Service name — used as container name and image name
         required: true
         type: string
       host_port:

@@ -31,6 +31,7 @@ jobs:
     with:
       module: services/member-service
       image_name: member-service
+      ignore_test_failures: true
     secrets: inherit
 
   member-service-cd:

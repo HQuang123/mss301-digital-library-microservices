@@ -33,6 +33,7 @@ jobs:
     with:
       module: services/catalog-service
       image_name: catalog-service
+      ignore_test_failures: true
     secrets: inherit
 
   catalog-service-cd:

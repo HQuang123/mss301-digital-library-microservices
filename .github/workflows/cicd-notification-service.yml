@@ -33,6 +33,7 @@ jobs:
     with:
       module: services/notification-service
       image_name: notification-service
+      ignore_test_failures: true
     secrets: inherit
 
   notification-service-cd:

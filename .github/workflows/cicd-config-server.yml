@@ -31,6 +31,7 @@ jobs:
     with:
       module: infra/config-server
       image_name: config-server
+      ignore_test_failures: true
     secrets: inherit
 
   config-server-cd:

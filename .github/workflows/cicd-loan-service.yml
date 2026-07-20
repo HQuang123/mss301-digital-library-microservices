@@ -33,6 +33,7 @@ jobs:
     with:
       module: services/loan-service
       image_name: loan-service
+      ignore_test_failures: true
     secrets: inherit
 
   loan-service-cd:

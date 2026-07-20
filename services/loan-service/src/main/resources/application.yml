@@ -6,6 +6,12 @@ spring:
   application:
     name: loan-service
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${keycloak.issuer-uri}
+
   config:
     import:
       # Supports IDE runs whose working directory is the repository root.

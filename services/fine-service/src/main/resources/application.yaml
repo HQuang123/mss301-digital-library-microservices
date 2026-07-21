@@ -7,7 +7,10 @@ spring:
     name: fine-service
   config:
     import:
+      # Supports IDE runs whose working directory is the repository root.
       - "optional:file:.env[.properties]"
+      # Supports Maven/module runs from services/fine-service.
+      - "optional:file:../../.env[.properties]"
       - "${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}"
   main:
     allow-bean-definition-overriding: true

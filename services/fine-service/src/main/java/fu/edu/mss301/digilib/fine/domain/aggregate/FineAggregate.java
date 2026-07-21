@@ -3,6 +3,7 @@ package fu.edu.mss301.digilib.fine.domain.aggregate;
 import fu.edu.mss301.digilib.fine.domain.entity.Fine;
 import fu.edu.mss301.digilib.fine.domain.entity.FinePolicy;
 import fu.edu.mss301.digilib.fine.domain.vo.FineRange;
+import fu.edu.mss301.digilib.fine.domain.vo.FineReason;
 import fu.edu.mss301.digilib.fine.domain.vo.FineStatus;
 
 import java.time.LocalDateTime;
@@ -23,45 +24,45 @@ public final class FineAggregate {
     }
 
     public Fine createFineFor(
-            Integer loanId,
-            Integer studentId,
+            Long loanId,
+            String studentId,
             String studentEmail,
             LocalDateTime dueDate,
-            LocalDateTime returnDate
+            LocalDateTime returnDate,
+            FineReason reason,
+            Long compensationAmount
     ) {
         validatePolicy(policy);
-        Integer validLoanId = requirePositive(loanId, "loanId");
-        Integer validStudentId = requirePositive(studentId, "studentId");
-        String validStudentEmail = requireText(studentEmail, "studentEmail");
+        Long validLoanId = requirePositive(loanId, "loanId");
+        String validStudentId = requireText(studentId, "studentId");
+        FineReason validReason = requireReason(reason);
+        long validCompensationAmount = requireNonNegative(
+                compensationAmount != null ? compensationAmount : 0L, "compensationAmount");
         FineRange range = FineRange.create(dueDate, returnDate);
 
         return Fine.builder()
                 .finePolicy(policy)
                 .loanId(validLoanId)
                 .studentId(validStudentId)
-                .studentEmail(validStudentEmail)
+                .studentEmail(studentEmail == null || studentEmail.isBlank() ? null : studentEmail.trim())
+                .reason(validReason)
                 .dueDate(range.getDueDate())
                 .returnDate(range.getReturnDate())
-                .amountDue(calculateAmount(range))
+                .compensationAmount(validCompensationAmount)
+                .amountDue(calculateAmount(range, validCompensationAmount))
                 .status(FineStatus.PENDING)
                 .build();
     }
 
-    public Fine createFineFor(
-            Integer loanId,
-            Integer studentId,
-            String studentEmail,
-            LocalDateTime dueDate
-    ) {
-        return createFineFor(loanId, studentId, studentEmail, dueDate, null);
-    }
-
-    public void recalculate(Fine fine, LocalDateTime returnDate) {
+    public void recalculate(Fine fine, LocalDateTime returnDate, Long compensationAmount) {
         Fine validFine = requirePolicyFine(fine);
+        long validCompensationAmount = requireNonNegative(
+                compensationAmount != null ? compensationAmount : 0L, "compensationAmount");
         FineRange range = FineRange.create(validFine.getDueDate(), returnDate);
 
         validFine.setReturnDate(range.getReturnDate());
-        validFine.setAmountDue(calculateAmount(range));
+        validFine.setCompensationAmount(validCompensationAmount);
+        validFine.setAmountDue(calculateAmount(range, validCompensationAmount));
     }
 
     public void markPaid(Fine fine) {
@@ -99,7 +100,7 @@ public final class FineAggregate {
         return Boolean.TRUE.equals(policy.getIsActive());
     }
 
-    private Long calculateAmount(FineRange range) {
+    private Long calculateAmount(FineRange range, long compensationAmount) {
         long overdueDays = range.overdueDays();
         long amount;
 
@@ -115,6 +116,12 @@ public final class FineAggregate {
             } catch (ArithmeticException exception) {
                 throw new IllegalStateException("calculated fine amount exceeds supported range", exception);
             }
+        }
+
+        try {
+            amount = Math.addExact(amount, compensationAmount);
+        } catch (ArithmeticException exception) {
+            throw new IllegalStateException("calculated fine amount exceeds supported range", exception);
         }
 
         return amount;
@@ -168,6 +175,22 @@ public final class FineAggregate {
         }
 
         return value;
+    }
+
+    private static Long requirePositive(Long value, String fieldName) {
+        if (value == null || value <= 0) {
+            throw new IllegalArgumentException(fieldName + " must be positive");
+        }
+
+        return value;
+    }
+
+    private static FineReason requireReason(FineReason reason) {
+        if (reason == null) {
+            throw new IllegalArgumentException("reason must not be null");
+        }
+
+        return reason;
     }
 
     private static Long requireNonNegative(Long value, String fieldName) {

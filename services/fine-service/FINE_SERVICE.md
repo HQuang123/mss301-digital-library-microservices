@@ -82,6 +82,7 @@ Represents a single fine issued for a loan.
 | `id`            | `Integer` (PK)    | Auto-generated                             |
 | `policy_id`     | `Integer` (FK)    | References `FinePolicy`; `LAZY` fetch      |
 | `loan_id`       | `Integer`         | ID of the loan that triggered the fine     |
+| `book_id`       | `Long`            | ID of the book from Loan Service; used only to look up the title from Catalog Service when displaying fine history — Fine Service does not store book data itself |
 | `student_id`    | `Integer`         | ID of the student                          |
 | `student_email` | `VARCHAR(100)`    | Email of the student                       |
 | `due_date`      | `DATETIME`        | Original book return deadline              |

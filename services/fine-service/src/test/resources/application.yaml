@@ -12,7 +12,12 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+  flyway:
+    enabled: false
 
 eureka:
   client:
     enabled: false
+
+services:
+  internal-api-key: test-only-internal-api-key-with-more-than-32-characters

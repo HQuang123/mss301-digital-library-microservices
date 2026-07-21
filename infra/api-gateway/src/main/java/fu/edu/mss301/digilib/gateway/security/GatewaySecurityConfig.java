@@ -66,6 +66,7 @@ public class GatewaySecurityConfig {
                                                                 "/api/notifications/jobs/due-soon/run",
                                                                 "/api/notifications/jobs/overdue/run")
                                                 .hasAnyRole("ADMIN", "LIBRARIAN")
+                                                .pathMatchers("/api/fines/librarian/**").hasAnyRole("ADMIN", "LIBRARIAN")
                                                 .anyExchange().authenticated())
                                 .exceptionHandling(exceptions -> exceptions
                                                 .authenticationEntryPoint(securityErrorWriter)

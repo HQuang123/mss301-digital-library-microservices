@@ -113,6 +113,8 @@ Fine Service creates Fine with reason = LOST_BOOK and status = PENDING.
 Loan Service updates loan status to LOST.
 Book Service updates book copy status to LOST.
 
+Note on the bookId/bookCopyId/bookTitle/bookValue fields sent in Flow 3/4/5 request bodies: Fine Service persists only bookId (as a reference for later enrichment — see FINE_HISTORY_FLOW.md). bookCopyId, bookTitle, and bookValue are not stored; bookValue is used transiently to calculate compensationAmount at creation time, and bookTitle is deliberately not persisted since it can go stale — Fine Service re-resolves it from Catalog Service on every read instead.
+
 Flow 6: Pay fine using SePay QR code
 
 Student opens fine detail page.
@@ -124,7 +126,7 @@ Fine Service checks:
 Fine exists
 Fine status is PENDING
 Fine totalAmount is greater than 0
-Fine Service creates FinePaymentTransaction with status = PENDING.
+Fine Service creates a PaymentAttempt with status = CREATED (transitions to PENDING once the QR is generated).
 Fine Service generates SePay QR payment information.
 Fine Service returns QR information to frontend.
 Student scans QR code and pays.
@@ -138,10 +140,12 @@ amount
 payment status
 duplicate webhook handling
 If valid:
-Update payment transaction status to SUCCESS.
+Update PaymentAttempt status to SUCCEEDED (via PaymentAttempt.markSucceeded(...)).
 Update fine status to PAID.
 Set fine.paidAt.
 Student can borrow again if there are no other PENDING fines.
+
+See FINE_HISTORY_FLOW.md for Flow 7: viewing fine payment history (student screen and librarian screen).
 
 Important design rules:
 

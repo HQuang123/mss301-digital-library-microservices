@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -29,9 +31,10 @@ public class LoanController {
     private final ManageLoanUseCase manageLoanUseCase;
 
     @PostMapping("/rent-books")
-    public ResponseEntity<LoanResponse> borrow(@Valid @RequestBody BorrowLoanRequest request) {
+    public ResponseEntity<LoanResponse> borrow(@Valid @RequestBody BorrowLoanRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
         LoanResponse response = LoanResponse.from(borrowBookUseCase.handle(new BorrowBookCommand(
-                request.memberId(), request.bookId(), request.bookType(), request.idempotencyKey())));
+                jwt.getSubject(), request.bookId(), request.bookType(), request.idempotencyKey())));
         return ResponseEntity.created(URI.create("/api/v1/loans/" + response.loanId())).body(response);
     }
 
@@ -48,10 +51,8 @@ public class LoanController {
     }
 
     @PostMapping("/loans/{loanId}/lost")
-    public LoanResponse reportLost(
-            @PathVariable Long loanId,
-            @RequestHeader(name = "X-Actor-Id", defaultValue = "SYSTEM") String actorId) {
-        return LoanResponse.from(manageLoanUseCase.reportLost(loanId, actorId));
+    public LoanResponse reportLost(@PathVariable Long loanId, @AuthenticationPrincipal Jwt jwt) {
+        return LoanResponse.from(manageLoanUseCase.reportLost(loanId, jwt.getSubject()));
     }
 
     @GetMapping("/loans/{loanId}")

@@ -12,6 +12,7 @@ import fu.edu.mss301.digilib.fine.domain.entity.PaymentAttempt;
 import fu.edu.mss301.digilib.fine.domain.vo.FineStatus;
 import fu.edu.mss301.digilib.fine.domain.vo.PaymentProvider;
 import fu.edu.mss301.digilib.fine.domain.vo.PaymentStatus;
+import fu.edu.mss301.digilib.fine.infrastructure.adapter.NotificationClientAdapter;
 import fu.edu.mss301.digilib.fine.infrastructure.persistence.FineJpaRepository;
 import fu.edu.mss301.digilib.fine.infrastructure.persistence.PaymentAttemptJpaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,8 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class SepayPaymentService {
@@ -37,14 +40,16 @@ public class SepayPaymentService {
     private final SepayProperties properties;
     private final Clock clock;
     private final SecureRandom secureRandom;
+    private final NotificationClientAdapter notificationClient;
 
     @Autowired
     public SepayPaymentService(
             FineJpaRepository fineRepository,
             PaymentAttemptJpaRepository paymentRepository,
             SepayProperties properties,
-            Clock clock) {
-        this(fineRepository, paymentRepository, properties, clock, new SecureRandom());
+            Clock clock,
+            NotificationClientAdapter notificationClient) {
+        this(fineRepository, paymentRepository, properties, clock, new SecureRandom(), notificationClient);
     }
 
     SepayPaymentService(
@@ -52,12 +57,14 @@ public class SepayPaymentService {
             PaymentAttemptJpaRepository paymentRepository,
             SepayProperties properties,
             Clock clock,
-            SecureRandom secureRandom) {
+            SecureRandom secureRandom,
+            NotificationClientAdapter notificationClient) {
         this.fineRepository = fineRepository;
         this.paymentRepository = paymentRepository;
         this.properties = properties;
         this.clock = clock;
         this.secureRandom = secureRandom;
+        this.notificationClient = notificationClient;
     }
 
     @Transactional
@@ -137,13 +144,32 @@ public class SepayPaymentService {
         LocalDateTime paidAt = LocalDateTime.now(clock);
         payment.markSucceeded(transactionId, webhook.referenceCode(), paidAt);
         fine.markPaid(paidAt);
-        System.out.println("Tra tien thanh cong");
+
+        notificationClient.sendFinePaidConfirmation(
+                fine.getId(), fine.getStudentId(), fine.getStudentEmail(), payment.getAmount(), paidAt.toString());
     }
 
     private String resolvePaymentCode(SepayWebhookRequest webhook) {
-        // SePay's content is the full transfer description and can contain
-        // additional words. The normalized payment code is carried separately.
-        return webhook.code().trim();
+        // SePay's own "code" field is auto-extracted from the bank content and
+        // truncates at the first non-digit, cutting our hex codes short (e.g.
+        // "DH020CBBC6A2EA" -> "DH020"). The raw content still carries the full
+        // code, so prefer extracting it from there and fall back to SePay's
+        // "code" field only if the expected pattern isn't found.
+        String fromContent = extractPaymentCodeFromContent(webhook.content());
+        if (fromContent != null) {
+            return fromContent;
+        }
+        return webhook.code() == null ? "" : webhook.code().trim();
+    }
+
+    private String extractPaymentCodeFromContent(String content) {
+        if (content == null) {
+            return null;
+        }
+        String prefix = properties.paymentCodePrefix().toUpperCase(Locale.ROOT);
+        Pattern pattern = Pattern.compile(Pattern.quote(prefix) + "[0-9A-F]{12}");
+        Matcher matcher = pattern.matcher(content.toUpperCase(Locale.ROOT));
+        return matcher.find() ? matcher.group() : null;
     }
 
     private void validatePayableFine(Fine fine) {

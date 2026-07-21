@@ -8,6 +8,7 @@ import fu.edu.mss301.digilib.fine.domain.entity.Fine;
 import fu.edu.mss301.digilib.fine.domain.entity.PaymentAttempt;
 import fu.edu.mss301.digilib.fine.domain.vo.FineStatus;
 import fu.edu.mss301.digilib.fine.domain.vo.PaymentStatus;
+import fu.edu.mss301.digilib.fine.infrastructure.adapter.NotificationClientAdapter;
 import fu.edu.mss301.digilib.fine.infrastructure.persistence.FineJpaRepository;
 import fu.edu.mss301.digilib.fine.infrastructure.persistence.PaymentAttemptJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +45,9 @@ class SepayPaymentServiceTests {
     @Mock
     private SecureRandom secureRandom;
 
+    @Mock
+    private NotificationClientAdapter notificationClient;
+
     private SepayPaymentService service;
 
     @BeforeEach
@@ -63,7 +67,8 @@ class SepayPaymentServiceTests {
                 paymentRepository,
                 properties,
                 CLOCK,
-                secureRandom
+                secureRandom,
+                notificationClient
         );
     }
 
@@ -110,6 +115,43 @@ class SepayPaymentServiceTests {
         assertEquals(FineStatus.PAID, fine.getStatus());
         assertNotNull(fine.getPaidAt());
         assertEquals(payment.getPaidAt(), fine.getPaidAt());
+        verify(notificationClient).sendFinePaidConfirmation(
+                fine.getId(), fine.getStudentId(), fine.getStudentEmail(), payment.getAmount(),
+                fine.getPaidAt().toString());
+    }
+
+    @Test
+    void webhookMatchesPaymentCodeFromContentWhenSepayTruncatesTheCodeField() {
+        // Real SePay behavior: the "code" field it auto-extracts truncates at
+        // the first non-digit, but the raw "content" still carries the full
+        // generated payment code (prefix + 12 hex chars).
+        Fine fine = pendingFine();
+        PaymentAttempt payment = pendingPayment(fine);
+        payment.setPaymentCode("FINE020CBBC6A2EA");
+
+        SepayWebhookRequest webhook = new SepayWebhookRequest(
+                69277746L,
+                "TPBank",
+                "2026-07-21 15:31:05",
+                "0010000000355",
+                null,
+                "FINE020",
+                "FINE020CBBC6A2EA chuyen tien",
+                "in",
+                "BankAPINotify FINE020CBBC6A2EA",
+                25000L,
+                71018L,
+                "669ITC1262028825"
+        );
+
+        when(paymentRepository.findBySepayTransactionId("69277746")).thenReturn(Optional.empty());
+        when(paymentRepository.findByPaymentCodeForUpdate("FINE020CBBC6A2EA"))
+                .thenReturn(Optional.of(payment));
+
+        service.processWebhook(webhook);
+
+        assertEquals(PaymentStatus.SUCCEEDED, payment.getStatus());
+        verify(paymentRepository, never()).findByPaymentCodeForUpdate("FINE020");
     }
 
     @Test
@@ -150,6 +192,8 @@ class SepayPaymentServiceTests {
                 .id(10)
                 .amountDue(25000L)
                 .status(FineStatus.PENDING)
+                .studentId("a91940da-c7e0-477a-ba59-ca34756ced99")
+                .studentEmail("phukak12345@gmail.com")
                 .build();
     }
 

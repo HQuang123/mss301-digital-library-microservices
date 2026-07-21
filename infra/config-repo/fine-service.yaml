@@ -24,6 +24,8 @@ spring:
 
 services:
   internal-api-key: ${INTERNAL_API_KEY}
+  notification:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
 
 sepay:
   bank: ${SEPAY_BANK:}

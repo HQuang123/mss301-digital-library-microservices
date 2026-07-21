@@ -75,7 +75,7 @@ public class Loan {
     @JoinColumn(name = "loan_id")
     private final List<LoanStatusHistory> histories = new ArrayList<>();
 
-    private Loan() {
+    protected Loan() {
     }
 
     public static Loan create(

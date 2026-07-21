@@ -10,6 +10,7 @@ import fu.edu.mss301.digilib.loan.domain.vo.OutboxStatus;
 import fu.edu.mss301.digilib.loan.infrastructure.adapter.BookCatalogClientAdapter;
 import fu.edu.mss301.digilib.loan.infrastructure.adapter.FineClientAdapter;
 import fu.edu.mss301.digilib.loan.infrastructure.adapter.MemberClientAdapter;
+import fu.edu.mss301.digilib.loan.infrastructure.adapter.NotificationClientAdapter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class BorrowBookUseCase {
     private final MemberClientAdapter memberClient;
     private final BookCatalogClientAdapter catalogClient;
     private final FineClientAdapter fineClient;
+    private final NotificationClientAdapter notificationClient;
 
     @Transactional
     public Loan handle(BorrowBookCommand command) {
@@ -33,13 +35,47 @@ public class BorrowBookUseCase {
                 .orElseGet(() -> borrow(command));
     }
 
+    @Transactional
+    public Loan approve(Loan request, String reviewerId) {
+        if (request.getStatus() != LoanStatus.PENDING) {
+            throw new IllegalStateException("Borrow request is no longer pending");
+        }
+
+        fineClient.assertCanBorrow(request.getMemberId());
+        MemberClientAdapter.MemberDetails member = memberClient.getMember(request.getMemberId());
+        long activeLoans = loanRepository.countByMemberIdAndStatusIn(
+                request.getMemberId(), List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE));
+        if (activeLoans >= member.borrowingLimit()) {
+            throw new IllegalStateException("Member borrowing limit exceeded");
+        }
+
+        Long copyId = null;
+        try {
+            if (!"DIGITAL".equalsIgnoreCase(request.getBookType())) {
+                copyId = catalogClient.reserveBook(request.getBookId());
+            }
+            request.approve(copyId, LocalDateTime.now().plusDays(member.loanPeriodDays()), reviewerId);
+            Loan saved = loanRepository.save(request);
+            outboxRepository.save(event(saved, "LoanCreatedEvent"));
+            BookCatalogClientAdapter.BookDetails book = catalogClient.getBookDetails(saved.getBookId());
+            notificationClient.sendBorrowConfirmation(
+                    saved.getLoanId(), saved.getMemberId(), member.email(), book.title(), saved.getDueDate());
+            return saved;
+        } catch (RuntimeException exception) {
+            if (copyId != null) {
+                catalogClient.releaseBook(copyId);
+            }
+            throw exception;
+        }
+    }
+
     private Loan borrow(BorrowBookCommand command) {
         // Fine Service is the source of truth for unpaid-fine borrowing eligibility.
         fineClient.assertCanBorrow(command.memberId());
-        MemberClientAdapter.MemberPolicy policy = memberClient.getPolicy(command.memberId());
+        MemberClientAdapter.MemberDetails member = memberClient.getMember(command.memberId());
         long activeLoans = loanRepository.countByMemberIdAndStatusIn(
                 command.memberId(), List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE));
-        if (activeLoans >= policy.borrowingLimit()) {
+        if (activeLoans >= member.borrowingLimit()) {
             throw new IllegalStateException("Member borrowing limit exceeded");
         }
 
@@ -53,10 +89,13 @@ public class BorrowBookUseCase {
                     command.bookId(),
                     copyId,
                     command.bookType(),
-                    LocalDateTime.now().plusDays(policy.loanPeriodDays()),
+                    LocalDateTime.now().plusDays(member.loanPeriodDays()),
                     command.idempotencyKey());
             Loan saved = loanRepository.save(loan);
             outboxRepository.save(event(saved, "LoanCreatedEvent"));
+            BookCatalogClientAdapter.BookDetails book = catalogClient.getBookDetails(saved.getBookId());
+            notificationClient.sendBorrowConfirmation(
+                    saved.getLoanId(), saved.getMemberId(), member.email(), book.title(), saved.getDueDate());
             return saved;
         } catch (RuntimeException exception) {
             if (copyId != null) {

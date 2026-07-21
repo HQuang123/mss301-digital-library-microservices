@@ -6,6 +6,12 @@ spring:
   application:
     name: loan-service
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${keycloak.issuer-uri}
+
   config:
     import:
       # Supports IDE runs whose working directory is the repository root.
@@ -32,6 +38,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  # Keep one canonical issuer in every environment. JWK discovery is derived
+  # from this issuer, avoiding a second URL that can drift independently.
+
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/digilib-realm}
 
 services:
   internal-api-key: ${INTERNAL_API_KEY}

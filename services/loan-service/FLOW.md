@@ -28,16 +28,18 @@ Only loans in `BORROWED` or `OVERDUE` status can be returned or reported as lost
 ```http
 POST /api/v1/rent-books
 Content-Type: application/json
+Authorization: Bearer <jwt>
 ```
 
 ```json
 {
-  "memberId": "member-keycloak-id",
   "bookId": 101,
   "bookType": "PHYSICAL",
   "idempotencyKey": "borrow-20260718-001"
 }
 ```
+
+`memberId` is not accepted from the client — Loan Service derives it from the `sub` claim of the caller's JWT, verified against Keycloak.
 
 ### Processing steps
 
@@ -186,7 +188,7 @@ The job can be disabled with `OVERDUE_FINE_JOB_ENABLED=false`.
 
 ```http
 POST /api/v1/loans/{loanId}/lost
-X-Actor-Id: <member-or-librarian-id>
+Authorization: Bearer <jwt>
 ```
 
 ### Processing steps
@@ -227,7 +229,7 @@ If Fine Service fails, Loan Service returns HTTP `502 Bad Gateway` and does not 
 
 ```http
 PUT /api/v1/loans/{loanId}/renew
-X-Actor-Id: <member-or-librarian-id>
+Authorization: Bearer <jwt>
 ```
 
 ### Processing steps
@@ -244,10 +246,11 @@ The renewal flow currently does not call Fine Service or Notification Service.
 ```http
 GET /api/v1/loans/{loanId}
 GET /api/v1/loans?page=0&size=20
-GET /api/v1/loans/my-loans?memberId={memberId}
+GET /api/v1/loans/my-loans
+Authorization: Bearer <jwt>
 ```
 
-These APIs only read Loan Service data and do not call Fine Service or Notification Service.
+`my-loans` derives `memberId` from the caller's JWT `sub` claim rather than accepting it as a parameter. These APIs only read Loan Service data and do not call Fine Service or Notification Service.
 
 ## Integration error rules
 
@@ -268,6 +271,7 @@ DEFAULT_BOOK_VALUE=250000
 OVERDUE_FINE_JOB_ENABLED=true
 OVERDUE_FINE_JOB_CRON=0 15 2 * * *
 INTERNAL_API_KEY=<shared-secret>
+KEYCLOAK_ISSUER_URI=http://localhost:8180/realms/digilib-realm
 ```
 
 Catalog Service may not currently return `bookValue`; in that case, Loan Service uses `DEFAULT_BOOK_VALUE`. Notification Service currently accepts a numeric `studentId`, so Loan Service maps a string member ID to a stable number when sending a notification.

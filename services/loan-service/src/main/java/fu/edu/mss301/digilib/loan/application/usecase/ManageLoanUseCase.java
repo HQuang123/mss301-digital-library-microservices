@@ -39,12 +39,14 @@ public class ManageLoanUseCase {
 
     @Transactional(readOnly = true)
     public Page<Loan> findAll(Pageable pageable) {
-        return loanRepository.findAll(pageable);
+        return loanRepository.findByStatusIn(
+                List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE, LoanStatus.RETURNED, LoanStatus.LOST), pageable);
     }
 
     @Transactional(readOnly = true)
     public List<Loan> findByMember(String memberId) {
-        return loanRepository.findByMemberIdOrderByBorrowedAtDesc(memberId);
+        return loanRepository.findByMemberIdAndStatusInOrderByBorrowedAtDesc(memberId,
+                List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE, LoanStatus.RETURNED, LoanStatus.LOST));
     }
 
     @Transactional
@@ -65,7 +67,7 @@ public class ManageLoanUseCase {
         catalogClient.releaseBook(saved.getCopyId());
         outboxRepository.save(event(saved, overdueDays > 0 ? "BookReturnedLateEvent" : "BookReturnedEvent"));
         notificationClient.sendReturnConfirmation(
-                saved.getMemberId(), details.memberEmail(), details.bookTitle(), saved.getReturnedAt());
+                saved.getLoanId(), saved.getMemberId(), details.memberEmail(), details.bookTitle(), saved.getReturnedAt());
         return saved;
     }
 
@@ -103,6 +105,30 @@ public class ManageLoanUseCase {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<fu.edu.mss301.digilib.loan.api.dto.LoanDueResponse> findDueSoon(int days, LocalDateTime now) {
+        LocalDateTime from = now.toLocalDate().plusDays(days).atStartOfDay();
+        LocalDateTime to = from.plusDays(1);
+        return loanRepository.findByStatusInAndDueDateBetween(
+                        List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE), from, to)
+                .stream().map(this::toDueResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<fu.edu.mss301.digilib.loan.api.dto.LoanDueResponse> findOverdue(LocalDateTime now) {
+        return loanRepository.findByStatusInAndDueDateBefore(
+                        List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE), now)
+                .stream().map(this::toDueResponse).toList();
+    }
+
+    private fu.edu.mss301.digilib.loan.api.dto.LoanDueResponse toDueResponse(Loan loan) {
+        MemberClientAdapter.MemberDetails member = memberClient.getMember(loan.getMemberId());
+        BookCatalogClientAdapter.BookDetails book = catalogClient.getBookDetails(loan.getBookId());
+        return new fu.edu.mss301.digilib.loan.api.dto.LoanDueResponse(
+                String.valueOf(loan.getLoanId()), loan.getMemberId(), member.email(),
+                book.title(), loan.getDueDate().toLocalDate());
+    }
+
     @Transactional
     public void createOrUpdateThresholdFine(Long loanId, LocalDateTime now) {
         Loan loan = findById(loanId);
@@ -121,11 +147,8 @@ public class ManageLoanUseCase {
     private IntegrationDetails integrationDetails(Loan loan) {
         MemberClientAdapter.MemberDetails member = memberClient.getMember(loan.getMemberId());
         BookCatalogClientAdapter.BookDetails book = catalogClient.getBookDetails(loan.getBookId());
-        String studentId = member.memberCode() == null || member.memberCode().isBlank()
-                ? member.id()
-                : member.memberCode();
         FineClientAdapter.FineContext fineContext = new FineClientAdapter.FineContext(
-                studentId,
+                member.id(),
                 String.valueOf(loan.getLoanId()),
                 String.valueOf(loan.getBookId()),
                 loan.getCopyId() == null ? null : String.valueOf(loan.getCopyId()),

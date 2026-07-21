@@ -2,6 +2,7 @@ package fu.edu.mss301.digilib.fine.api.controller;
 
 import fu.edu.mss301.digilib.fine.api.dto.ApiErrorResponse;
 import fu.edu.mss301.digilib.fine.application.exception.BusinessConflictException;
+import fu.edu.mss301.digilib.fine.application.exception.ForbiddenException;
 import fu.edu.mss301.digilib.fine.application.exception.InvalidWebhookException;
 import fu.edu.mss301.digilib.fine.application.exception.InvalidWebhookSignatureException;
 import fu.edu.mss301.digilib.fine.application.exception.ResourceNotFoundException;
@@ -23,6 +24,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(BusinessConflictException.class)
     ResponseEntity<ApiErrorResponse> handleConflict(BusinessConflictException exception) {
         return error(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    ResponseEntity<ApiErrorResponse> handleForbidden(ForbiddenException exception) {
+        return error(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 
     @ExceptionHandler(InvalidWebhookException.class)

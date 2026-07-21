@@ -44,7 +44,19 @@ public class GatewaySecurityConfig {
                                                 // The existing highest-priority Gateway filter returns 404
                                                 // without forwarding this private service-to-service path.
                                                 .pathMatchers("/api/v1/members/internal/**").permitAll()
-                                                .pathMatchers(HttpMethod.GET, "/files/images/**").permitAll()
+                                                .pathMatchers(HttpMethod.GET, "/files/**").permitAll()
+                                                .pathMatchers(HttpMethod.GET, "/api/v1/borrow-requests/me")
+                                                .authenticated()
+                                                .pathMatchers(HttpMethod.POST, "/api/v1/borrow-requests")
+                                                .authenticated()
+                                                .pathMatchers(HttpMethod.DELETE, "/api/v1/borrow-requests/*")
+                                                .authenticated()
+                                                .pathMatchers(HttpMethod.GET, "/api/v1/borrow-requests")
+                                                .hasAnyRole("ADMIN", "LIBRARIAN")
+                                                .pathMatchers(HttpMethod.POST,
+                                                                "/api/v1/borrow-requests/*/approve",
+                                                                "/api/v1/borrow-requests/*/reject")
+                                                .hasAnyRole("ADMIN", "LIBRARIAN")
                                                 // SePay calls this directly with an HMAC signature
                                                 // (X-SePay-Signature), not a JWT — verified downstream
                                                 // by SepayWebhookVerifier in fine-service.

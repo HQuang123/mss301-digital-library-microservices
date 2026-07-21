@@ -65,7 +65,7 @@ spring:
             - id: loan-service
               uri: lb://LOAN-SERVICE
               predicates:
-                - Path=/api/v1/loans/**,/api/v1/rent-books
+                - Path=/api/v1/loans/**,/api/v1/rent-books,/api/v1/borrow-requests/**
               filters:
                 - name: CircuitBreaker
                   args:

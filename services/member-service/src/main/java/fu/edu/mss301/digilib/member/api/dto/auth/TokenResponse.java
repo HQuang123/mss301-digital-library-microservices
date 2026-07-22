@@ -10,6 +10,7 @@ import fu.edu.mss301.digilib.member.infrastructure.keycloak.KeycloakTokenRespons
 public record TokenResponse(
         @JsonProperty("access_token")  String accessToken,
         @JsonProperty("refresh_token") String refreshToken,
+        @JsonProperty("id_token")      String idToken,
         @JsonProperty("expires_in")    long expiresIn,
         @JsonProperty("refresh_expires_in") long refreshExpiresIn,
         @JsonProperty("token_type")    String tokenType
@@ -18,6 +19,7 @@ public record TokenResponse(
         return new TokenResponse(
                 kcResponse.accessToken(),
                 kcResponse.refreshToken(),
+                kcResponse.idToken(),
                 kcResponse.expiresIn(),
                 kcResponse.refreshExpiresIn(),
                 kcResponse.tokenType()

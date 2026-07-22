@@ -17,7 +17,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 		"spring.cloud.discovery.enabled=false",
 		"eureka.client.enabled=false",
 		"spring.jpa.hibernate.ddl-auto=validate",
-		"spring.jpa.show-sql=false"
+		"spring.jpa.show-sql=false",
+		// Required so the OAuth2 resource-server auto-config can build a JwtDecoder;
+		// without it the security starter fails the context boot.
+		"spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:8180/realms/digilib-realm"
 })
 class DigilibCatalogServiceApplicationTests {
 

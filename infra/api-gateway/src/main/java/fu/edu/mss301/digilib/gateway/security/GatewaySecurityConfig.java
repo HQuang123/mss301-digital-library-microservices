@@ -23,82 +23,106 @@ import java.util.List;
 @EnableConfigurationProperties(GatewayCorsProperties.class)
 public class GatewaySecurityConfig {
 
-        @Bean
-        public SecurityWebFilterChain gatewaySecurityWebFilterChain(
-                        ServerHttpSecurity http,
-                        GatewaySecurityErrorWriter securityErrorWriter) {
-                return http
-                                .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                                // CorsWebFilter is ordered before Spring Security so browser
-                                // preflight requests never fail due to missing authentication.
-                                .cors(ServerHttpSecurity.CorsSpec::disable)
-                                .authorizeExchange(exchanges -> exchanges
-                                                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                                                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
-                                                .pathMatchers("/actuator/**").hasRole("ADMIN")
-                                                .pathMatchers(HttpMethod.POST,
-                                                                "/api/v1/auth/register",
-                                                                "/api/v1/auth/login",
-                                                                "/api/v1/auth/oauth2/exchange")
-                                                .permitAll()
-                                                // The existing highest-priority Gateway filter returns 404
-                                                // without forwarding this private service-to-service path.
-                                                .pathMatchers("/api/v1/members/internal/**").permitAll()
-                                                .pathMatchers(HttpMethod.GET, "/files/**").permitAll()
-                                                .pathMatchers(HttpMethod.GET, "/api/catalog/books").permitAll()
-                                                .pathMatchers(HttpMethod.GET, "/api/v1/borrow-requests/me")
-                                                .authenticated()
-                                                .pathMatchers(HttpMethod.POST, "/api/v1/borrow-requests")
-                                                .authenticated()
-                                                .pathMatchers(HttpMethod.DELETE, "/api/v1/borrow-requests/*")
-                                                .authenticated()
-                                                .pathMatchers(HttpMethod.GET, "/api/v1/borrow-requests")
-                                                .hasAnyRole("ADMIN", "LIBRARIAN")
-                                                .pathMatchers(HttpMethod.POST,
-                                                                "/api/v1/borrow-requests/*/approve",
-                                                                "/api/v1/borrow-requests/*/reject")
-                                                .hasAnyRole("ADMIN", "LIBRARIAN")
-                                                // SePay calls this directly with an HMAC signature
-                                                // (X-SePay-Signature), not a JWT — verified downstream
-                                                // by SepayWebhookVerifier in fine-service.
-                                                .pathMatchers(HttpMethod.POST, "/api/fines/payments/sepay/webhook")
-                                                .permitAll()
-                                                .pathMatchers(HttpMethod.POST,
-                                                                "/api/notifications/jobs/due-soon/run",
-                                                                "/api/notifications/jobs/overdue/run")
-                                                .hasAnyRole("ADMIN", "LIBRARIAN")
-                                                .pathMatchers("/api/fines/librarian/**").hasAnyRole("ADMIN", "LIBRARIAN")
-                                                .anyExchange().authenticated())
-                                .exceptionHandling(exceptions -> exceptions
-                                                .authenticationEntryPoint(securityErrorWriter)
-                                                .accessDeniedHandler(securityErrorWriter))
-                                .oauth2ResourceServer(oauth2 -> oauth2
-                                                .authenticationEntryPoint(securityErrorWriter)
-                                                .accessDeniedHandler(securityErrorWriter)
-                                                .jwt(jwt -> jwt.jwtAuthenticationConverter(
-                                                                jwtAuthenticationConverter())))
-                                .build();
-        }
+    @Bean
+    public SecurityWebFilterChain gatewaySecurityWebFilterChain(
+            ServerHttpSecurity http,
+            GatewaySecurityErrorWriter securityErrorWriter) {
+        return http
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                // CorsWebFilter is ordered before Spring Security so browser
+                // preflight requests never fail due to missing authentication.
+                .cors(ServerHttpSecurity.CorsSpec::disable)
+                .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .pathMatchers("/actuator/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.POST,
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/oauth2/exchange",
+                                "/api/v1/auth/forgot-password")
+                        .permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
+                        // The existing highest-priority Gateway filter returns 404
+                        // without forwarding this private service-to-service path.
+                        .pathMatchers("/api/v1/members/internal/**").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/files/**").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/catalog/books").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/v1/borrow-requests/me")
+                        .authenticated()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/borrow-requests")
+                        .authenticated()
+                        .pathMatchers(HttpMethod.DELETE, "/api/v1/borrow-requests/*")
+                        .authenticated()
+                        .pathMatchers(HttpMethod.GET, "/api/v1/borrow-requests")
+                        .hasAnyRole("ADMIN", "LIBRARIAN")
+                        .pathMatchers(HttpMethod.POST,
+                                "/api/v1/borrow-requests/*/approve",
+                                "/api/v1/borrow-requests/*/reject")
+                        .hasAnyRole("ADMIN", "LIBRARIAN")
+                        // SePay calls this directly with an HMAC signature
+                        // (X-SePay-Signature), not a JWT — verified downstream
+                        // by SepayWebhookVerifier in fine-service.
+                        .pathMatchers(HttpMethod.POST, "/api/fines/payments/sepay/webhook")
+                        .permitAll()
+                        .pathMatchers(HttpMethod.POST,
+                                "/api/notifications/jobs/due-soon/run",
+                                "/api/notifications/jobs/overdue/run")
+                        .hasAnyRole("ADMIN", "LIBRARIAN")
+                        // ── Catalog admin verbs ────────────────────────────────
+                        // Anyone authenticated may browse the catalog (GET); only
+                        // admin/librarian may create, update, restore, delete, or
+                        // upload covers. The paths below mirror the BookController,
+                        // BookCopyController, CategoryController,
+                        // ClassificationController, and DigitalResourceController
+                        // mutating routes. Catalog-service additionally enforces the
+                        // same rules locally as defense in depth.
+                        .pathMatchers(HttpMethod.POST,
+                                "/api/catalog/books",
+                                "/api/catalog/books/{bookId}/cover",
+                                "/api/catalog/books/{bookId}/copies",
+                                "/api/catalog/categories",
+                                "/api/catalog/classifications",
+                                "/api/catalog/digital-resources")
+                        .hasAnyRole("ADMIN", "LIBRARIAN")
+                        .pathMatchers(HttpMethod.PUT, "/api/catalog/**")
+                        .hasAnyRole("ADMIN", "LIBRARIAN")
+                        .pathMatchers(HttpMethod.PATCH, "/api/catalog/**")
+                        .hasAnyRole("ADMIN", "LIBRARIAN")
+                        .pathMatchers(HttpMethod.DELETE, "/api/catalog/**")
+                        .hasAnyRole("ADMIN", "LIBRARIAN")
+                        .pathMatchers("/api/fines/librarian/**").hasAnyRole("ADMIN", "LIBRARIAN")
+                        .anyExchange().authenticated())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(securityErrorWriter)
+                        .accessDeniedHandler(securityErrorWriter))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(securityErrorWriter)
+                        .accessDeniedHandler(securityErrorWriter)
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(
+                                jwtAuthenticationConverter())))
+                .build();
+    }
 
-        @Bean
-        @Order(Ordered.HIGHEST_PRECEDENCE)
-        public CorsWebFilter corsWebFilter(GatewayCorsProperties corsProperties) {
-                CorsConfiguration configuration = new CorsConfiguration();
-                configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
-                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-                configuration.setAllowedHeaders(List.of("*"));
-                configuration.setExposedHeaders(List.of(HttpHeaders.LOCATION, HttpHeaders.CONTENT_DISPOSITION));
-                configuration.setAllowCredentials(true);
-                configuration.setMaxAge(3600L);
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public CorsWebFilter corsWebFilter(GatewayCorsProperties corsProperties) {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of(HttpHeaders.LOCATION, HttpHeaders.CONTENT_DISPOSITION));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
-                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-                source.registerCorsConfiguration("/**", configuration);
-                return new CorsWebFilter(source);
-        }
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return new CorsWebFilter(source);
+    }
 
-        private ReactiveJwtAuthenticationConverterAdapter jwtAuthenticationConverter() {
-                JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-                converter.setJwtGrantedAuthoritiesConverter(new KeycloakRealmRoleConverter());
-                return new ReactiveJwtAuthenticationConverterAdapter(converter);
-        }
+    private ReactiveJwtAuthenticationConverterAdapter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(new KeycloakRealmRoleConverter());
+        return new ReactiveJwtAuthenticationConverterAdapter(converter);
+    }
 }

@@ -34,6 +34,8 @@ public class MemberProfile implements Persistable<String> {
     private int borrowingLimit;
     @Column("loan_period_days")
     private int loanPeriodDays;
+    @Column("reservation_priority")
+    private int reservationPriority;
     @Column("outstanding_balance")
     private BigDecimal outstandingBalance;
     @Column("avatar_key")

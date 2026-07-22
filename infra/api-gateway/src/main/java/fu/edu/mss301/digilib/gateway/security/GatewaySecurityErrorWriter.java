@@ -38,7 +38,16 @@ public class GatewaySecurityErrorWriter implements ServerAuthenticationEntryPoin
                 "Bạn không có quyền truy cập tài nguyên này.");
     }
 
-    private Mono<Void> write(ServerWebExchange exchange, HttpStatus status, String code, String message) {
+    /**
+     * Renders a structured JSON error response. Exposed so custom security
+     * filters (e.g. {@link OnboardingRequiredFilter}) can reuse the same wire
+     * shape used by the auth entry point and access-denied handler.
+     */
+    public Mono<Void> write(ServerWebExchange exchange, HttpStatus status, String code, String message) {
+        return writeInternal(exchange, status, code, message);
+    }
+
+    private Mono<Void> writeInternal(ServerWebExchange exchange, HttpStatus status, String code, String message) {
         exchange.getResponse().setStatusCode(status);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         exchange.getResponse().getHeaders().setCacheControl(CacheControl.noStore());

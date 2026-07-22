@@ -23,7 +23,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
                         // Internal service-to-service calls (loan-service → notification-service).
-                        // Blocked at the gateway; permitted here because they carry no user JWT.
+                        // Blocked at the gateway for external callers and additionally gated by
+                        // the InternalApiKeyFilter (constant-time X-Internal-Api-Key check) for
+                        // defense in depth when the service is reachable directly.
                         .requestMatchers(HttpMethod.POST,
                                 "/api/notifications",
                                 "/api/notifications/return-confirmation").permitAll()

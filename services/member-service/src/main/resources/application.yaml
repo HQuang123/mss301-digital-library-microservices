@@ -48,6 +48,7 @@ keycloak:
   # No default on purpose: a confidential client must never start with a
   # repository-owned or well-known secret.
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
+  require-email-verification: ${KEYCLOAK_REQUIRE_EMAIL_VERIFICATION:true}
 
 services:
   # Shared only by trusted service-to-service callers. No repository default.
@@ -56,5 +57,5 @@ services:
 server:
   # Local Java processes are reachable through the gateway only. Container
   # deployments must override this to 0.0.0.0 and keep the port un-published.
-  address: ${INTERNAL_SERVICE_BIND_ADDRESS:0.0.0.0}
+  address: ${INTERNAL_SERVICE_BIND_ADDRESS:127.0.0.1}
   port: ${MEMBER_SERVICE_PORT:8083}

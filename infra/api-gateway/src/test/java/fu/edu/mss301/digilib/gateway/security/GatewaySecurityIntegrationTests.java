@@ -96,25 +96,46 @@ class GatewaySecurityIntegrationTests {
     }
 
     @Test
-    void rejectsBorrowRequestQueueForRegularMembers() {
+    void onboardingFilterBlocksAuthenticatedUserWithoutOnboardingRole() {
+        // Authenticated, but carries only the default Keycloak role — not a
+        // student/lecturer (and not librarian/admin). The OnboardingRequiredFilter
+        // must reject with 403 ONBOARDING_REQUIRED until the user completes the
+        // PATCH /api/v1/members/me/role call.
         webTestClient.mutateWith(mockJwt()
-                        .jwt(jwt -> jwt.subject("member-1"))
-                        .authorities(new SimpleGrantedAuthority("ROLE_MEMBER")))
+                        .jwt(jwt -> jwt.subject("not-yet-onboarded"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_OFFLINE_ACCESS")))
                 .get()
-                .uri("/api/v1/borrow-requests?status=PENDING")
+                .uri("/api/v1/loans")
                 .exchange()
                 .expectStatus().isForbidden()
+                .expectHeader().contentTypeCompatibleWith("application/json")
                 .expectBody()
-                .jsonPath("$.code").isEqualTo("ACCESS_DENIED");
+                .jsonPath("$.code").isEqualTo("ONBOARDING_REQUIRED")
+                .jsonPath("$.path").isEqualTo("/api/v1/loans")
+                .jsonPath("$.requestId").isNotEmpty();
     }
 
     @Test
-    void allowsBorrowRequestQueueForLibrarians() {
+    void onboardingFilterAllowsWhitelistedMePathForUnonboardedUser() {
+        // A not-yet-onboarded user must still be able to read their own profile
+        // and to call the onboarding endpoint itself.
         webTestClient.mutateWith(mockJwt()
-                        .jwt(jwt -> jwt.subject("librarian-1"))
-                        .authorities(new SimpleGrantedAuthority("ROLE_LIBRARIAN")))
+                        .jwt(jwt -> jwt.subject("not-yet-onboarded"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_OFFLINE_ACCESS")))
                 .get()
-                .uri("/api/v1/borrow-requests?status=PENDING")
+                .uri("/api/v1/members/me")
+                .exchange()
+                .expectStatus().value(status ->
+                        assertThat(status).isNotEqualTo(HttpStatus.FORBIDDEN.value()));
+    }
+
+    @Test
+    void onboardingFilterAllowsStudentToAccessProtectedRoute() {
+        webTestClient.mutateWith(mockJwt()
+                        .jwt(jwt -> jwt.subject("student-1"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
+                .get()
+                .uri("/api/v1/loans")
                 .exchange()
                 .expectStatus().value(status ->
                         assertThat(status).isNotIn(

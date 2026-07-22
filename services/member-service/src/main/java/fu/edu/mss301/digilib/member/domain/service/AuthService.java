@@ -51,27 +51,31 @@ public class AuthService {
         return keycloakClient
                 .createUser(request.email(), request.firstName(), request.lastName())
                 .onErrorMap(WebClientResponseException.class, ex -> mapKeycloakRegisterError(ex, request.email()))
-                .flatMap(keycloakId -> keycloakClient
-                        .setPassword(keycloakId, request.password())
-                        .onErrorMap(WebClientResponseException.class, this::mapPasswordPolicyError)
-                        .then(keycloakClient.sendVerificationEmail(keycloakId)
-                                .onErrorMap(error -> new ApiException(
-                                        HttpStatus.SERVICE_UNAVAILABLE,
-                                        "VERIFICATION_EMAIL_UNAVAILABLE",
-                                        "We could not send the verification email. Please try again."
-                                )))
-                        .then(Mono.defer(() -> profileService.registerOrFetchProfile(
-                                        keycloakId,
-                                        request.email(),
-                                        request.firstName(),
-                                        request.lastName())
-                                .onErrorMap(error -> new ApiException(
-                                        HttpStatus.INTERNAL_SERVER_ERROR,
-                                        "REGISTRATION_FAILED",
-                                        "Registration failed. Please try again."
-                                ))))
-                        .onErrorResume(error -> rollbackKeycloakUser(keycloakId, error))
-                );
+                .flatMap(keycloakId -> {
+                    Mono<Void> sendEmail = keycloakClient.isRequireEmailVerification() ?
+                            keycloakClient.sendVerificationEmail(keycloakId)
+                                    .onErrorMap(error -> new ApiException(
+                                            HttpStatus.SERVICE_UNAVAILABLE,
+                                            "VERIFICATION_EMAIL_UNAVAILABLE",
+                                            "We could not send the verification email. Please try again."
+                                    )) : Mono.empty();
+
+                    return keycloakClient
+                            .setPassword(keycloakId, request.password())
+                            .onErrorMap(WebClientResponseException.class, this::mapPasswordPolicyError)
+                            .then(sendEmail)
+                            .then(Mono.defer(() -> profileService.registerOrFetchProfile(
+                                            keycloakId,
+                                            request.email(),
+                                            request.firstName(),
+                                            request.lastName())
+                                    .onErrorMap(error -> new ApiException(
+                                            HttpStatus.INTERNAL_SERVER_ERROR,
+                                            "REGISTRATION_FAILED",
+                                            "Registration failed. Please try again."
+                                    ))))
+                            .onErrorResume(error -> rollbackKeycloakUser(keycloakId, error));
+                });
     }
 
     // =========================================================================
@@ -112,14 +116,26 @@ public class AuthService {
     /**
      * Full logout:
      *  1. Revokes the refresh token so it cannot be used for silent renewal.
-     *  2. Performs a backchannel session logout which invalidates the Keycloak
+     *  2. Revokes the access token (if provided) to prevent further use.
+     *  3. Performs a backchannel session logout which invalidates the Keycloak
      *     session and all access tokens issued for it.
+     *  4. Returns the Keycloak RP-Initiated Logout URL that the frontend MUST
+     *     redirect the browser to in order to clear Keycloak's browser cookies.
      *
-     * Both steps are attempted regardless of each other's outcome.
+     * All revocation steps are attempted regardless of each other's outcome.
      */
-    public Mono<Void> logout(String refreshToken) {
-        Mono<Void> revoke  = keycloakClient.revokeRefreshToken(refreshToken)
+    public Mono<String> logout(String accessToken, String refreshToken,
+                               String idToken, String postLogoutRedirectUri) {
+        Mono<Void> revokeRefresh = keycloakClient.revokeRefreshToken(refreshToken)
                 .onErrorMap(WebClientResponseException.class, this::mapKeycloakLogoutError);
+
+        Mono<Void> revokeAccess = accessToken != null ?
+                keycloakClient.revokeAccessToken(accessToken)
+                        .onErrorResume(e -> {
+                            log.warn("Access token revocation failed: {}", e.getMessage());
+                            return Mono.empty();
+                        })
+                : Mono.empty();
 
         Mono<Void> session = keycloakClient.logoutSession(refreshToken)
                 .onErrorResume(e -> {
@@ -128,8 +144,38 @@ public class AuthService {
                     return Mono.empty();
                 });
 
-        // Execute revoke first, then session invalidation
-        return revoke.then(session);
+        String logoutRedirectUrl = keycloakClient.buildRpInitiatedLogoutUrl(idToken, postLogoutRedirectUri);
+
+        return Mono.when(revokeRefresh, revokeAccess, session)
+                .thenReturn(logoutRedirectUrl);
+    }
+
+    // =========================================================================
+    // Forgot Password
+    // =========================================================================
+
+    /**
+     * Best-effort forgot-password flow that closes the user-existence oracle:
+     * always completes successfully regardless of whether the email is
+     * registered, while still sending a reset email when the user exists.
+     *
+     * Previously the endpoint returned {@code 404 USER_NOT_FOUND} when the
+     * email was unknown — that lets attackers enumerate registered addresses.
+     * The endpoint now ignores both "user not found" and "email send failed"
+     * so the observable behavior is identical whether or not the account
+     * exists. The controller layer wraps this with {@code 202 ACCEPTED}.
+     */
+    public Mono<Void> forgotPassword(String email) {
+        return keycloakClient.findUserByEmail(email)
+                .flatMap(keycloakClient::sendForgotPasswordEmail)
+                .onErrorResume(error -> {
+                    log.warn("Forgot-password flow for '{}' could not complete: {}",
+                            email, error.getMessage());
+                    return Mono.empty();
+                })
+                .switchIfEmpty(Mono.fromRunnable(() ->
+                        log.warn("Forgot-password requested for unregistered email")))
+                .then();
     }
 
     // =========================================================================

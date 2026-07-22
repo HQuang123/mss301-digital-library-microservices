@@ -17,6 +17,14 @@ spring:
   mail:
     host: localhost
     port: 2525
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/digilib-realm
+
+services:
+  internal-api-key: test-only-internal-api-key-with-more-than-32-characters
 
 eureka:
   client:

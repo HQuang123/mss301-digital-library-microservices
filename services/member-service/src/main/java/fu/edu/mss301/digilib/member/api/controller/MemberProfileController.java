@@ -3,6 +3,7 @@ package fu.edu.mss301.digilib.member.api.controller;
 import fu.edu.mss301.digilib.member.api.dto.MemberResponse;
 import fu.edu.mss301.digilib.member.api.dto.MemberStatusRequest;
 import fu.edu.mss301.digilib.member.api.dto.MemberUpdateRequest;
+import fu.edu.mss301.digilib.member.api.dto.RoleSelectionRequest;
 import fu.edu.mss301.digilib.member.domain.service.MemberProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -71,9 +72,23 @@ public class MemberProfileController {
     }
 
     /**
+     * Self-service onboarding: lets the authenticated user pick their role
+     * ({@code student} or {@code lecturer}). The choice is mirrored into the
+     * Keycloak realm role and the profile's {@code memberType}. Librarian and
+     * admin roles are NOT selectable here — they are admin-granted only.
+     */
+    @PatchMapping("/me/role")
+    public Mono<MemberResponse> selectRole(@AuthenticationPrincipal Jwt jwt,
+                                           @Valid @RequestBody RoleSelectionRequest request) {
+        return profileService.assignUserRole(jwt.getSubject(), request.role())
+                .map(MemberResponse::from);
+    }
+
+    /**
      * Endpoint for internal inter-service communication (e.g., Loan Service checking borrowing capability)
      */
     @GetMapping("/{memberId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN') or #memberId == authentication.principal.subject")
     public Mono<MemberResponse> getProfileById(@PathVariable String memberId) {
         return profileService.getProfileById(memberId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Member profile not found")))

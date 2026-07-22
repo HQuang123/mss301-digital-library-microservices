@@ -9,3 +9,6 @@ spring:
     import:
       - "optional:file:.env[.properties]"
       - "${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}"
+
+services:
+  internal-api-key: ${INTERNAL_API_KEY}

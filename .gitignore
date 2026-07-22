@@ -28,3 +28,4 @@ buildNumber.properties
 # bo qua file ca nhan
 /markdown-notes
 /.github/agents
+AGENTS.md

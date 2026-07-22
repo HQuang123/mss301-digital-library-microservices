@@ -11,6 +11,12 @@ spring:
       - "optional:file:.env[.properties]"
       - "${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}"
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/digilib-realm}
+
   datasource:
     url: ${CATALOG_DB_URL:jdbc:postgresql://localhost:5432/catalog_service_dbs}
     username: ${CATALOG_DB_USERNAME:postgres}

@@ -98,7 +98,76 @@ Because the architecture delegates OIDC identity management to **Keycloak**, the
    GET https://keycloak.huynq.space/realms/digilib-realm/protocol/openid-connect/auth?client_id=digilib-auth&redirect_uri=<your-frontend-redirect>&response_type=code&scope=openid%20profile%20email&kc_idp_hint=google
    ```
 
-### B. Tokens & Profile Generation:
+### B. Forcing Google Account Selection (Choosing a Different Account):
+By default, if the user already has an active Google session in the browser, Google will log them in automatically with the active account. To force Google to display the **"Choose an account"** screen so the user can select a different account, append the `prompt=select_account` parameter to the OIDC authorization redirect URL:
+```http
+GET https://keycloak.huynq.space/realms/digilib-realm/protocol/openid-connect/auth?client_id=digilib-auth&redirect_uri=<your-frontend-redirect>&response_type=code&scope=openid%20profile%20email&kc_idp_hint=google&prompt=select_account
+```
+> [!NOTE]
+> Make sure "Forward Prompt" is enabled in the Google Identity Provider settings within the Keycloak Admin Console so Keycloak forwards this parameter to Google's authorization endpoint.
+
+### C. Cleansing Browser Session on Logout (RP-Initiated Logout):
+The backchannel logout endpoint `POST /api/v1/auth/logout` revokes tokens and invalidates the session in Keycloak's database, **and now also returns the RP-Initiated Logout URL** that the frontend must redirect the browser to.
+
+> [!IMPORTANT]
+> Without this browser redirect, Keycloak's browser cookies (`AUTH_SESSION_ID`, `KEYCLOAK_SESSION`, `KEYCLOAK_IDENTITY`) survive on the Keycloak domain. On the next login attempt, Keycloak sees these cookies and **silently reuses the old session without ever redirecting to Google**. This is why `prompt=select_account` has no effect — the request never reaches Google.
+
+#### Updated Logout API Request:
+```http
+POST /api/v1/auth/logout
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "refresh_token": "<refresh_token>",
+  "id_token": "<id_token>",
+  "post_logout_redirect_uri": "http://localhost:5173"
+}
+```
+
+* `refresh_token` **(required)**: The refresh token to revoke.
+* `id_token` *(optional)*: The raw `id_token` received at login. Including this skips Keycloak's logout confirmation screen.
+* `post_logout_redirect_uri` *(optional)*: Where Keycloak should redirect the browser after clearing its cookies. **Must** be registered in Keycloak under Clients → `digilib-auth` → "Valid post logout redirect URIs".
+
+#### Updated Logout API Response:
+```json
+{
+  "logout_redirect_url": "http://localhost:8180/realms/digilib-realm/protocol/openid-connect/logout?client_id=digilib-auth&id_token_hint=...&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A5173"
+}
+```
+
+#### Complete Frontend Logout Flow:
+```javascript
+async function logout() {
+  // Step 1: Call backend to revoke tokens (returns the redirect URL)
+  const response = await fetch('/api/v1/auth/logout', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      refresh_token: refreshToken,
+      id_token: idToken,                          // store this at login!
+      post_logout_redirect_uri: window.location.origin,
+    }),
+  });
+  const { logout_redirect_url } = await response.json();
+
+  // Step 2: Clear local state
+  clearLocalStorage();
+  clearSessionStorage();
+
+  // Step 3: Redirect browser to Keycloak to clear its cookies
+  window.location.href = logout_redirect_url;
+}
+```
+
+> [!NOTE]
+> The login response (`POST /api/v1/auth/login` and `POST /api/v1/auth/oauth2/exchange`) now includes an `id_token` field. **Store this value** (in-memory or secure storage) so you can pass it back during logout.
+
+### D. Tokens & Profile Generation:
 1. After Google authenticates the user, Keycloak registers the profile internally and issues a standard OIDC token (JWT) signed by Keycloak.
 2. The frontend attaches this token in the header as a `Bearer` token for all API requests to the Member Service.
 3. The first time the user accesses the library, and the frontend requests `GET /api/v1/members/me`, the backend performs **Just-In-Time (JIT) Profile Generation** utilizing the OIDC standard claims parsed from the Google token (`sub`, `email`, `given_name`, `family_name`). This maps the user profile automatically in the local database.
+

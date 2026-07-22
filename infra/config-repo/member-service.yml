@@ -39,6 +39,7 @@ keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/digilib-realm}
   client-id: ${KEYCLOAK_CLIENT_ID:digilib-auth}
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
+  require-email-verification: ${KEYCLOAK_REQUIRE_EMAIL_VERIFICATION:true}
 
 services:
   internal-api-key: ${INTERNAL_API_KEY}

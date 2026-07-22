@@ -16,7 +16,6 @@ digilib/
 │   ├── book-service/     # Quản lý danh mục sách
 │   ├── member-service/      # Quản lý hồ sơ độc giả
 │   ├── loan-service/   # Quản lý mượn/trả sách
-│   ├── identity-service/    # Quản lý xác thực và phân quyền (Auth/Role)
 │   ├── notification-service/# Gửi email/thông báo nhắc nhở
 │   └── fine-service/        # Quản lý các khoản phạt trễ hạn
 │

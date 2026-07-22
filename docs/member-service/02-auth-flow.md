@@ -62,9 +62,10 @@ Clients should branch on `code`, not on the human-readable `message`.
 
 ## 🚪 3. User Logout Flow
 
-The logout endpoint requires authentication (a valid Bearer JWT in the request headers) **AND** the payload containing the `refresh_token`. It performs two actions:
+The logout endpoint requires authentication (a valid Bearer JWT in the request headers, which is parsed as the `access_token`) **AND** the payload containing the `refresh_token`. It performs three actions:
 
-1. **Token Revocation (`/revoke`)**: Revokes the refresh token so it can no longer be used for silent token renewals.
-2. **Backchannel Session Invalidation (`/logout`)**: Contacts Keycloak to terminate the user's active session. This immediately invalidates the access token and any other tokens issued during that session across all devices.
+1. **Access Token Revocation (`/revoke`)**: Revokes the access token extracted from the `Authorization` header to prevent any further use of this token.
+2. **Refresh Token Revocation (`/revoke`)**: Revokes the refresh token so it can no longer be used for silent token renewals.
+3. **Backchannel Session Invalidation (`/logout`)**: Contacts Keycloak to terminate the user's active session. This immediately invalidates the session and any other tokens issued during that session across all devices.
 
-Logout is best-effort. If the session logout fails but the revocation succeeds, the endpoint will still return `204 No Content`.
+Logout is best-effort. If any token revocation or the session logout fails, the remaining actions are still executed, and the endpoint still returns `204 No Content`.

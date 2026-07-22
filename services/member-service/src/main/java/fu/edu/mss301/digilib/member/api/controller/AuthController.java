@@ -3,7 +3,9 @@ package fu.edu.mss301.digilib.member.api.controller;
 import fu.edu.mss301.digilib.member.api.dto.MemberResponse;
 import fu.edu.mss301.digilib.member.api.dto.auth.LoginRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.LogoutRequest;
+import fu.edu.mss301.digilib.member.api.dto.auth.LogoutResponse;
 import fu.edu.mss301.digilib.member.api.dto.auth.OAuth2ExchangeRequest;
+import fu.edu.mss301.digilib.member.api.dto.auth.ForgotPasswordRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.RegisterRequest;
 import fu.edu.mss301.digilib.member.api.dto.auth.TokenResponse;
 import fu.edu.mss301.digilib.member.domain.service.AuthService;
@@ -63,16 +65,38 @@ public class AuthController {
     /**
      * Logout the current session.
      *
-     * Requires a valid JWT in the Authorization header AND the refresh_token in
-     * the request body. Both the refresh token and the Keycloak session are
-     * invalidated, preventing any further token renewal.
+     * Revokes the access token, refresh token, and Keycloak session, then
+     * returns the RP-Initiated Logout URL that the frontend MUST redirect
+     * the browser to in order to clear Keycloak's browser cookies.
      *
-     * Returns 204 No Content on success.
+     * Without this browser redirect, Keycloak will silently reuse the old
+     * session on the next login, bypassing identity provider redirects
+     * (e.g., Google account chooser).
+     *
+     * Returns 200 OK with a logout_redirect_url the frontend should
+     * redirect the browser to via window.location.href.
      */
-
     @PostMapping("/logout")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public Mono<Void> logout(@Valid @RequestBody LogoutRequest request) {
-        return authService.logout(request.refreshToken());
+    public Mono<LogoutResponse> logout(
+            @Valid @RequestBody LogoutRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String accessToken = null;
+        if (authHeader != null && authHeader.length() > 7 && authHeader.substring(0, 7).equalsIgnoreCase("Bearer ")) {
+            accessToken = authHeader.substring(7);
+        }
+        return authService.logout(accessToken, request.refreshToken(),
+                        request.idToken(), request.postLogoutRedirectUri())
+                .map(LogoutResponse::new);
+    }
+
+    /**
+     * Trigger self-service forgot password flow.
+     *
+     * Sends a password reset email (via Keycloak) to the user's email if registered.
+     */
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Mono<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return authService.forgotPassword(request.email());
     }
 }

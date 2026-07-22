@@ -13,6 +13,9 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.flyway.enabled=false",
         "MEMBER_DB_USERNAME=test-only-database-user",
         "MEMBER_DB_PASSWORD=test-only-database-password",
+        // Pin the loopback-address env var so the contextLoads assertion is
+        // deterministic regardless of what an operator's local .env defines.
+        "INTERNAL_SERVICE_BIND_ADDRESS=127.0.0.1",
         "keycloak.base-url=http://localhost:8180",
         "keycloak.realm=digilib-realm",
         "keycloak.issuer-uri=http://localhost:8180/realms/digilib-realm",

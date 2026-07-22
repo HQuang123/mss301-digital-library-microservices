@@ -2,6 +2,7 @@ package fu.edu.mss301.digilib.member.domain.service;
 
 import fu.edu.mss301.digilib.member.domain.entity.MemberProfile;
 import fu.edu.mss301.digilib.member.domain.repository.MemberProfileRepository;
+import fu.edu.mss301.digilib.member.infrastructure.keycloak.KeycloakAdminClient;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -18,7 +19,8 @@ import static org.mockito.Mockito.when;
 class MemberProfileServiceTests {
 
     private final MemberProfileRepository repository = mock(MemberProfileRepository.class);
-    private final MemberProfileService service = new MemberProfileService(repository);
+    private final KeycloakAdminClient keycloakClient = mock(KeycloakAdminClient.class);
+    private final MemberProfileService service = new MemberProfileService(repository, keycloakClient);
 
     @Test
     void registerOrFetchProfileCreatesDefaultProfileWhenMissing() {

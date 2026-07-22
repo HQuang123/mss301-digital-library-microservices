@@ -187,7 +187,7 @@ public class SepayPaymentService {
         if (webhook == null || webhook.id() == null || webhook.id() <= 0) {
             throw new InvalidWebhookException("SePay transaction id is required");
         }
-        if (webhook.code() == null || webhook.code().isBlank()) {
+        if (resolvePaymentCode(webhook).isBlank()) {
             throw new InvalidWebhookException("Payment code is required");
         }
         if (!"in".equalsIgnoreCase(webhook.transferType())) {

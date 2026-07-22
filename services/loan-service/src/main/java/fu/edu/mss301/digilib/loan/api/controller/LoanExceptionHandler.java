@@ -28,7 +28,7 @@ public class LoanExceptionHandler {
         String message = exception.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .orElse("Invalid request");
+                .orElse("Yêu cầu không hợp lệ");
         return response(HttpStatus.BAD_REQUEST, message);
     }
 
@@ -41,7 +41,16 @@ public class LoanExceptionHandler {
         return ResponseEntity.status(status).body(Map.of(
                 "timestamp", Instant.now().toString(),
                 "status", status.value(),
-                "error", status.getReasonPhrase(),
-                "message", message == null ? status.getReasonPhrase() : message));
+                "error", vietnameseError(status),
+                "message", message == null ? vietnameseError(status) : message));
+    }
+
+    private String vietnameseError(HttpStatus status) {
+        return switch (status) {
+            case BAD_REQUEST -> "Yêu cầu không hợp lệ";
+            case CONFLICT -> "Xung đột dữ liệu";
+            case BAD_GATEWAY -> "Không thể kết nối dịch vụ phụ thuộc";
+            default -> "Đã xảy ra lỗi";
+        };
     }
 }

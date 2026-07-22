@@ -57,7 +57,7 @@ public class BorrowRequestUseCase {
                 return requestRepository.findApprovedByLoanStatus(loanStatus, pageable)
                         .map(BorrowRequestResponse::from);
             } catch (IllegalArgumentException invalidLoanStatus) {
-                throw new IllegalArgumentException("Unsupported borrow request status: " + status);
+                throw new IllegalArgumentException("Trạng thái yêu cầu mượn không được hỗ trợ: " + status);
             }
         }
     }
@@ -87,7 +87,7 @@ public class BorrowRequestUseCase {
         requireAuthenticatedUser(memberId);
         BorrowRequest request = findPendingForUpdate(requestId);
         if (!request.getMemberId().equals(memberId)) {
-            throw new IllegalStateException("A member can only cancel their own borrow request");
+            throw new IllegalStateException("Thành viên chỉ có thể hủy yêu cầu mượn của chính mình");
         }
         request.cancel(memberId);
         requestRepository.saveAndFlush(request);
@@ -97,36 +97,39 @@ public class BorrowRequestUseCase {
         requireAuthenticatedUser(memberId);
         if (requestRepository.existsByMemberIdAndBookIdAndStatus(
                 memberId, command.bookId(), BorrowRequestStatus.PENDING)) {
-            throw new IllegalStateException("A pending borrow request already exists for this book");
+            throw new IllegalStateException("Bạn đã có yêu cầu mượn sách này đang chờ duyệt");
         }
+        // Re-check on the server immediately before creating PENDING so the
+        // frontend eligibility check cannot be bypassed or become authoritative.
+        borrowBookUseCase.checkEligibility(memberId);
         try {
             BorrowRequest request = BorrowRequest.create(
                     memberId, command.bookId(), command.bookType(), command.idempotencyKey());
             return BorrowRequestResponse.from(requestRepository.saveAndFlush(request));
         } catch (DataIntegrityViolationException exception) {
-            throw new IllegalStateException("A pending or duplicate borrow request already exists");
+            throw new IllegalStateException("Yêu cầu mượn đang chờ duyệt hoặc yêu cầu trùng lặp đã tồn tại");
         }
     }
 
     private BorrowRequest ensureIdempotentOwner(BorrowRequest request, String memberId) {
         requireAuthenticatedUser(memberId);
         if (!request.getMemberId().equals(memberId)) {
-            throw new IllegalStateException("Idempotency key belongs to another member");
+            throw new IllegalStateException("Mã chống trùng lặp đã được sử dụng bởi thành viên khác");
         }
         return request;
     }
 
     private BorrowRequest findPendingForUpdate(Long requestId) {
         if (requestId == null) {
-            throw new IllegalArgumentException("Borrow request ID is required");
+            throw new IllegalArgumentException("Thiếu mã yêu cầu mượn");
         }
         return requestRepository.findByIdForUpdate(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found: " + requestId));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy yêu cầu mượn: " + requestId));
     }
 
     private void requireAuthenticatedUser(String memberId) {
         if (memberId == null || memberId.isBlank()) {
-            throw new IllegalArgumentException("Authenticated member is required");
+            throw new IllegalArgumentException("Không xác định được thành viên đang đăng nhập");
         }
     }
 }

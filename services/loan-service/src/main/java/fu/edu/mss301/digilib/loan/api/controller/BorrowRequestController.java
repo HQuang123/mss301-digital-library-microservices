@@ -1,10 +1,12 @@
 package fu.edu.mss301.digilib.loan.api.controller;
 
 import fu.edu.mss301.digilib.loan.api.dto.BorrowRequestResponse;
+import fu.edu.mss301.digilib.loan.api.dto.BorrowEligibilityResponse;
 import fu.edu.mss301.digilib.loan.api.dto.CreateBorrowRequest;
 import fu.edu.mss301.digilib.loan.api.dto.LoanResponse;
 import fu.edu.mss301.digilib.loan.api.dto.RejectBorrowRequest;
 import fu.edu.mss301.digilib.loan.application.usecase.BorrowRequestUseCase;
+import fu.edu.mss301.digilib.loan.application.usecase.BorrowBookUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +32,13 @@ public class BorrowRequestController {
     static final String AUTHENTICATED_USER_HEADER = "X-Authenticated-User-Id";
 
     private final BorrowRequestUseCase useCase;
+    private final BorrowBookUseCase borrowBookUseCase;
+
+    @GetMapping("/eligibility")
+    public BorrowEligibilityResponse checkEligibility(
+            @RequestHeader(AUTHENTICATED_USER_HEADER) String memberId) {
+        return borrowBookUseCase.checkEligibility(memberId);
+    }
 
     @PostMapping
     public ResponseEntity<BorrowRequestResponse> create(

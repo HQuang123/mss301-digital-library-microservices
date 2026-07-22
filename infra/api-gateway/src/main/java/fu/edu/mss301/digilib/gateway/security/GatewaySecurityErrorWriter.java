@@ -29,13 +29,13 @@ public class GatewaySecurityErrorWriter implements ServerAuthenticationEntryPoin
     @Override
     public Mono<Void> commence(ServerWebExchange exchange, AuthenticationException exception) {
         return write(exchange, HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED",
-                "A valid Bearer token is required to access this resource.");
+                "Cần cung cấp Bearer token hợp lệ để truy cập tài nguyên này.");
     }
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, org.springframework.security.access.AccessDeniedException exception) {
         return write(exchange, HttpStatus.FORBIDDEN, "ACCESS_DENIED",
-                "You do not have permission to access this resource.");
+                "Bạn không có quyền truy cập tài nguyên này.");
     }
 
     /**
@@ -58,7 +58,7 @@ public class GatewaySecurityErrorWriter implements ServerAuthenticationEntryPoin
         ApiErrorResponse body = new ApiErrorResponse(
                 Instant.now(),
                 status.value(),
-                status.getReasonPhrase(),
+                status == HttpStatus.UNAUTHORIZED ? "Chưa xác thực" : "Không có quyền truy cập",
                 code,
                 message,
                 exchange.getRequest().getPath().value(),

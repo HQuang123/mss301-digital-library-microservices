@@ -5,6 +5,10 @@ spring:
     import:
       - "optional:file:.env[.properties]"
       - "optional:file:../../.env[.properties]"
+      # Local fallback when running this module from infra/api-gateway.
+      - "optional:file:../config-repo/api-gateway.yml"
+      # Local fallback when running from the repository root or an IDE.
+      - "optional:file:infra/config-repo/api-gateway.yml"
       - "${CONFIG_SERVER_IMPORT:optional:configserver:http://localhost:8888}"
   security:
     oauth2:

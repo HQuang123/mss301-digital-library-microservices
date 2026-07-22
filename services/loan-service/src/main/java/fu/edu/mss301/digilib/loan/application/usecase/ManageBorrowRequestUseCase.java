@@ -24,7 +24,7 @@ public class ManageBorrowRequestUseCase {
     public Loan create(String memberId, Long bookId, String bookType, String idempotencyKey) {
         return loanRepository.findByIdempotencyKey(idempotencyKey).orElseGet(() -> {
             if (loanRepository.existsByMemberIdAndBookIdAndStatus(memberId, bookId, LoanStatus.PENDING)) {
-                throw new IllegalStateException("A pending borrow request already exists for this book");
+                throw new IllegalStateException("Bạn đã có yêu cầu mượn sách này đang chờ duyệt");
             }
             memberClient.getMember(memberId);
             catalogClient.getBookDetails(bookId);
@@ -59,7 +59,7 @@ public class ManageBorrowRequestUseCase {
     public Loan cancel(Long requestId, String memberId) {
         Loan request = findPending(requestId);
         if (!request.getMemberId().equals(memberId)) {
-            throw new IllegalArgumentException("Borrow request does not belong to the authenticated member");
+            throw new IllegalArgumentException("Yêu cầu mượn không thuộc về thành viên đang đăng nhập");
         }
         request.cancel(memberId);
         return loanRepository.save(request);
@@ -67,9 +67,9 @@ public class ManageBorrowRequestUseCase {
 
     private Loan findPending(Long requestId) {
         Loan request = loanRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found: " + requestId));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy yêu cầu mượn: " + requestId));
         if (request.getStatus() != LoanStatus.PENDING) {
-            throw new IllegalStateException("Borrow request is no longer pending");
+            throw new IllegalStateException("Yêu cầu mượn không còn ở trạng thái chờ duyệt");
         }
         return request;
     }

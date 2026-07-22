@@ -1,5 +1,6 @@
 package fu.edu.mss301.digilib.loan.application.usecase;
 
+import fu.edu.mss301.digilib.loan.api.dto.BorrowEligibilityResponse;
 import fu.edu.mss301.digilib.loan.application.command.BorrowBookCommand;
 import fu.edu.mss301.digilib.loan.domain.aggregate.Loan;
 import fu.edu.mss301.digilib.loan.domain.entity.SagaOutbox;
@@ -35,19 +36,37 @@ public class BorrowBookUseCase {
                 .orElseGet(() -> borrow(command));
     }
 
+    @Transactional(readOnly = true)
+    public BorrowEligibilityResponse checkEligibility(String memberId) {
+        if (memberId == null || memberId.isBlank()) {
+            throw new IllegalArgumentException("Không xác định được thành viên đang đăng nhập");
+        }
+
+        fineClient.assertCanBorrow(memberId);
+        MemberClientAdapter.MemberDetails member = memberClient.getMember(memberId);
+        long activeLoans = loanRepository.countByMemberIdAndStatusIn(
+                memberId, List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE));
+        if (activeLoans >= member.borrowingLimit()) {
+            throw new IllegalStateException("Bạn đã đạt hạn mức mượn sách");
+        }
+
+        return new BorrowEligibilityResponse(
+                true,
+                activeLoans,
+                member.borrowingLimit(),
+                member.borrowingLimit() - activeLoans,
+                member.loanPeriodDays(),
+                "Member is eligible to create a borrow request");
+    }
+
     @Transactional
     public Loan approve(Loan request, String reviewerId) {
         if (request.getStatus() != LoanStatus.PENDING) {
-            throw new IllegalStateException("Borrow request is no longer pending");
+            throw new IllegalStateException("Yêu cầu mượn không còn ở trạng thái chờ duyệt");
         }
 
-        fineClient.assertCanBorrow(request.getMemberId());
+        checkEligibility(request.getMemberId());
         MemberClientAdapter.MemberDetails member = memberClient.getMember(request.getMemberId());
-        long activeLoans = loanRepository.countByMemberIdAndStatusIn(
-                request.getMemberId(), List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE));
-        if (activeLoans >= member.borrowingLimit()) {
-            throw new IllegalStateException("Member borrowing limit exceeded");
-        }
 
         Long copyId = null;
         try {
@@ -71,13 +90,8 @@ public class BorrowBookUseCase {
 
     private Loan borrow(BorrowBookCommand command) {
         // Fine Service is the source of truth for unpaid-fine borrowing eligibility.
-        fineClient.assertCanBorrow(command.memberId());
+        checkEligibility(command.memberId());
         MemberClientAdapter.MemberDetails member = memberClient.getMember(command.memberId());
-        long activeLoans = loanRepository.countByMemberIdAndStatusIn(
-                command.memberId(), List.of(LoanStatus.BORROWED, LoanStatus.OVERDUE));
-        if (activeLoans >= member.borrowingLimit()) {
-            throw new IllegalStateException("Member borrowing limit exceeded");
-        }
 
         Long copyId = null;
         try {

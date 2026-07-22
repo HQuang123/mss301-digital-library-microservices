@@ -87,16 +87,16 @@ public class Loan {
             String idempotencyKey) {
 
         if (memberId == null || memberId.isBlank())
-            throw new IllegalArgumentException("member required");
+            throw new IllegalArgumentException("Thiếu thông tin thành viên");
 
         if (bookId == null)
-            throw new IllegalArgumentException("book required");
+            throw new IllegalArgumentException("Thiếu thông tin sách");
 
         if (dueDate == null || !dueDate.isAfter(LocalDateTime.now()))
-            throw new IllegalArgumentException("due date must be in the future");
+            throw new IllegalArgumentException("Hạn trả phải là một thời điểm trong tương lai");
 
         if (idempotencyKey == null || idempotencyKey.isBlank())
-            throw new IllegalArgumentException("idempotency key required");
+            throw new IllegalArgumentException("Thiếu mã chống trùng lặp yêu cầu");
 
         Loan loan = new Loan();
 
@@ -119,11 +119,11 @@ public class Loan {
 
     public static Loan request(String memberId, Long bookId, String bookType, String idempotencyKey) {
         if (memberId == null || memberId.isBlank())
-            throw new IllegalArgumentException("member required");
+            throw new IllegalArgumentException("Thiếu thông tin thành viên");
         if (bookId == null)
-            throw new IllegalArgumentException("book required");
+            throw new IllegalArgumentException("Thiếu thông tin sách");
         if (idempotencyKey == null || idempotencyKey.isBlank())
-            throw new IllegalArgumentException("idempotency key required");
+            throw new IllegalArgumentException("Thiếu mã chống trùng lặp yêu cầu");
 
         LocalDateTime now = LocalDateTime.now();
         Loan loan = new Loan();
@@ -143,9 +143,9 @@ public class Loan {
     public void approve(Long reservedCopyId, LocalDateTime approvedDueDate, String reviewerId) {
         requirePending();
         if (approvedDueDate == null || !approvedDueDate.isAfter(LocalDateTime.now()))
-            throw new IllegalArgumentException("due date must be in the future");
+            throw new IllegalArgumentException("Hạn trả phải là một thời điểm trong tương lai");
         if (!"DIGITAL".equalsIgnoreCase(bookType) && reservedCopyId == null)
-            throw new IllegalArgumentException("physical book copy required");
+            throw new IllegalArgumentException("Thiếu thông tin bản sao sách vật lý");
 
         LocalDateTime now = LocalDateTime.now();
         LoanStatus previousStatus = status;
@@ -162,7 +162,7 @@ public class Loan {
     public void reject(String reviewerId, String reason) {
         requirePending();
         if (reason == null || reason.isBlank())
-            throw new IllegalArgumentException("rejection reason required");
+            throw new IllegalArgumentException("Vui lòng nhập lý do từ chối");
         status = LoanStatus.REJECTED;
         reviewedAt = LocalDateTime.now();
         reviewedBy = reviewerId;
@@ -183,17 +183,17 @@ public class Loan {
 
     private void requirePending() {
         if (status != LoanStatus.PENDING)
-            throw new IllegalStateException("Borrow request is no longer pending");
+            throw new IllegalStateException("Yêu cầu mượn không còn ở trạng thái chờ duyệt");
     }
 
     public void renew(String changedBy) {
 
         if (status != LoanStatus.BORROWED)
-            throw new IllegalStateException("Only an active loan can be renewed");
+            throw new IllegalStateException("Chỉ có thể gia hạn phiếu đang mượn");
 
         if (renewalCount >= maxRenewals)
             throw new IllegalStateException(
-                    "Maximum renewals exceeded");
+                    "Đã đạt số lần gia hạn tối đa");
 
         renewalCount++;
         dueDate = dueDate.plusDays(14);
@@ -205,7 +205,7 @@ public class Loan {
 
         if (status != LoanStatus.BORROWED && status != LoanStatus.OVERDUE)
             throw new IllegalStateException(
-                    "Only an active or overdue loan can be returned");
+                    "Chỉ có thể trả sách đang mượn hoặc đã quá hạn");
 
         LoanStatus previousStatus = status;
         status = LoanStatus.RETURNED;
@@ -216,7 +216,7 @@ public class Loan {
 
     public void markLost(String changedBy) {
         if (status != LoanStatus.BORROWED && status != LoanStatus.OVERDUE) {
-            throw new IllegalStateException("Only an active or overdue loan can be marked as lost");
+            throw new IllegalStateException("Chỉ có thể báo mất sách đang mượn hoặc đã quá hạn");
         }
         LoanStatus previousStatus = status;
         status = LoanStatus.LOST;
@@ -232,7 +232,7 @@ public class Loan {
             LoanStatus previousStatus = status;
             status = LoanStatus.OVERDUE;
             updatedAt = LocalDateTime.now();
-            addHistory(previousStatus, status, "SYSTEM", "Due date exceeded");
+            addHistory(previousStatus, status, "SYSTEM", "Đã quá hạn trả sách");
         }
     }
 

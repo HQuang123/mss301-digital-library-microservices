@@ -31,13 +31,13 @@ public class FallbackController {
         HttpStatus status = timeout ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.SERVICE_UNAVAILABLE;
         String code = timeout ? "UPSTREAM_TIMEOUT" : "UPSTREAM_UNAVAILABLE";
         String message = timeout
-                ? "The upstream service did not respond in time."
-                : "The upstream service is temporarily unavailable.";
+                ? "Dịch vụ xử lý yêu cầu không phản hồi kịp thời."
+                : "Dịch vụ xử lý yêu cầu hiện tạm thời không khả dụng.";
 
         GatewayFallbackResponse body = new GatewayFallbackResponse(
                 Instant.now(),
                 status.value(),
-                status.getReasonPhrase(),
+                timeout ? "Dịch vụ phản hồi quá thời gian" : "Dịch vụ không khả dụng",
                 code,
                 service,
                 originalPath(exchange),

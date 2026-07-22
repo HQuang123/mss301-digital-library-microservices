@@ -31,6 +31,7 @@ public record FineResponse(
     }
 
     public static FineResponse from(Fine fine, String bookTitle, String studentName) {
+
         return new FineResponse(
                 fine.getId(),
                 fine.getLoanId(),

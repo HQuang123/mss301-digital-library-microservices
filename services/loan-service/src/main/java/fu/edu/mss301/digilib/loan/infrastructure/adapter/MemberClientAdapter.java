@@ -33,7 +33,7 @@ public class MemberClientAdapter {
                 .body(MemberResponse.class);
 
         if (response == null) {
-            throw new IllegalStateException("Member service returned an empty response");
+            throw new IllegalStateException("Dịch vụ thành viên không trả về dữ liệu");
         }
         return new MemberDetails(
                 response.id(), response.email(), response.memberCode(),

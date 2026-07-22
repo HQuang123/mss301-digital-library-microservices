@@ -32,18 +32,18 @@ public class FineClientAdapter {
                     .body(BorrowEligibilityResponse.class);
 
             if (response == null) {
-                throw new DownstreamServiceException("Fine service returned an empty eligibility response", null);
+                throw new DownstreamServiceException("Dịch vụ khoản phạt không trả về kết quả kiểm tra điều kiện mượn", null);
             }
             if (!response.canBorrow()) {
                 String reason = response.reason() == null || response.reason().isBlank()
-                        ? "Student has an unpaid fine"
+                        ? "Bạn đang có khoản phạt chưa thanh toán"
                         : response.reason();
                 throw new IllegalStateException(reason);
             }
         } catch (IllegalStateException exception) {
             throw exception;
         } catch (RestClientException exception) {
-            throw new DownstreamServiceException("Cannot check borrowing eligibility with fine service", exception);
+            throw new DownstreamServiceException("Không thể kiểm tra điều kiện mượn với dịch vụ khoản phạt", exception);
         }
     }
 
@@ -77,7 +77,7 @@ public class FineClientAdapter {
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException exception) {
-            throw new DownstreamServiceException("Fine service call failed for " + path, exception);
+            throw new DownstreamServiceException("Không thể kết nối đến dịch vụ khoản phạt", exception);
         }
     }
 

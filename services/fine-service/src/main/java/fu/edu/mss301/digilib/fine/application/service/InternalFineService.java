@@ -40,7 +40,7 @@ public class InternalFineService {
     public BorrowEligibilityResponse checkBorrowEligibility(String studentId) {
         boolean hasPendingFine = fineRepository.existsByStudentIdAndStatus(studentId, FineStatus.PENDING);
         if (hasPendingFine) {
-            return new BorrowEligibilityResponse(false, "Student has an unpaid fine");
+            return new BorrowEligibilityResponse(false, "Bạn đang có khoản phạt chưa thanh toán");
         }
         return new BorrowEligibilityResponse(true, null);
     }

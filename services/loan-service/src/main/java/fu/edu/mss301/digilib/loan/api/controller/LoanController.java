@@ -46,8 +46,9 @@ public class LoanController {
     @PutMapping("/loans/{loanId}/renew")
     public LoanResponse renew(
             @PathVariable Long loanId,
-            @RequestHeader(name = "X-Actor-Id", defaultValue = "SYSTEM") String actorId) {
-        return LoanResponse.from(manageLoanUseCase.renew(loanId, actorId));
+            @AuthenticationPrincipal Jwt jwt) {
+        ensureOwnerOrStaff(manageLoanUseCase.findById(loanId).getMemberId(), jwt);
+        return LoanResponse.from(manageLoanUseCase.renew(loanId, jwt.getSubject()));
     }
 
     @PostMapping("/loans/{loanId}/lost")
@@ -56,8 +57,10 @@ public class LoanController {
     }
 
     @GetMapping("/loans/{loanId}")
-    public LoanResponse findById(@PathVariable Long loanId) {
-        return LoanResponse.from(manageLoanUseCase.findById(loanId));
+    public LoanResponse findById(@PathVariable Long loanId, @AuthenticationPrincipal Jwt jwt) {
+        var loan = manageLoanUseCase.findById(loanId);
+        ensureOwnerOrStaff(loan.getMemberId(), jwt);
+        return LoanResponse.from(loan);
     }
 
     @GetMapping("/loans")
@@ -79,7 +82,7 @@ public class LoanController {
         if (ownerId.equals(jwt.getSubject()) || hasStaffRole(jwt))
             return;
         throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.FORBIDDEN, "Loan belongs to another member");
+                org.springframework.http.HttpStatus.FORBIDDEN, "Phiếu mượn thuộc về thành viên khác");
     }
 
     private boolean hasStaffRole(Jwt jwt) {

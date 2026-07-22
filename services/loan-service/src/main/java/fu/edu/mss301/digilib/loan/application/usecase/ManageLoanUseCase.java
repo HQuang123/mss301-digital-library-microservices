@@ -34,7 +34,7 @@ public class ManageLoanUseCase {
     @Transactional(readOnly = true)
     public Loan findById(Long loanId) {
         return loanRepository.findById(loanId)
-                .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phiếu mượn: " + loanId));
     }
 
     @Transactional(readOnly = true)
@@ -167,7 +167,7 @@ public class ManageLoanUseCase {
 
     private void ensureActive(Loan loan) {
         if (loan.getStatus() != LoanStatus.BORROWED && loan.getStatus() != LoanStatus.OVERDUE) {
-            throw new IllegalStateException("Loan is not active: " + loan.getLoanId());
+            throw new IllegalStateException("Phiếu mượn không còn hiệu lực: " + loan.getLoanId());
         }
     }
 

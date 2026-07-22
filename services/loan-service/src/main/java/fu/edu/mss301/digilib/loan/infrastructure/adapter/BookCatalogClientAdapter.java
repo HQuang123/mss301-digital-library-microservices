@@ -36,7 +36,7 @@ public class BookCatalogClientAdapter {
                     .findFirst()
                     .orElse(null);
         if (availableCopy == null) {
-            throw new IllegalStateException("No available book copy");
+            throw new IllegalStateException("Sách hiện không còn bản sao có thể mượn");
         }
 
         updateStatus(availableCopy.copyId(), "BORROWED");
@@ -63,14 +63,14 @@ public class BookCatalogClientAdapter {
                 .retrieve()
                 .body(BookResponse.class);
         if (response == null) {
-            throw new IllegalStateException("Catalog service returned an empty book response");
+            throw new IllegalStateException("Dịch vụ danh mục không trả về thông tin sách");
         }
         long bookValue = response.bookValue() == null || response.bookValue() <= 0
                 ? defaultBookValue
                 : response.bookValue();
         return new BookDetails(
                 response.bookId(),
-                response.title() == null || response.title().isBlank() ? "Book " + bookId : response.title(),
+                response.title() == null || response.title().isBlank() ? "Sách " + bookId : response.title(),
                 bookValue);
     }
 

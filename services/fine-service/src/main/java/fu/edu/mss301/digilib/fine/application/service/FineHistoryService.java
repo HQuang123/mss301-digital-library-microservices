@@ -143,4 +143,5 @@ public class FineHistoryService {
         );
         return fullName.isBlank() ? null : fullName;
     }
+
 }

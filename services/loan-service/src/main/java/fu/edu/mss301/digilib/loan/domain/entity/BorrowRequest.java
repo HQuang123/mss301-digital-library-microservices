@@ -69,20 +69,20 @@ public class BorrowRequest {
 
     public static BorrowRequest create(String memberId, Long bookId, String bookType, String idempotencyKey) {
         if (memberId == null || memberId.isBlank()) {
-            throw new IllegalArgumentException("Authenticated member is required");
+            throw new IllegalArgumentException("Không xác định được thành viên đang đăng nhập");
         }
         if (bookId == null) {
-            throw new IllegalArgumentException("Book is required");
+            throw new IllegalArgumentException("Vui lòng chọn sách");
         }
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new IllegalArgumentException("Idempotency key is required");
+            throw new IllegalArgumentException("Thiếu mã chống trùng lặp yêu cầu");
         }
 
         String normalizedBookType = bookType == null || bookType.isBlank()
                 ? "PHYSICAL"
                 : bookType.toUpperCase(Locale.ROOT);
         if (!normalizedBookType.equals("PHYSICAL") && !normalizedBookType.equals("DIGITAL")) {
-            throw new IllegalArgumentException("Book type must be PHYSICAL or DIGITAL");
+            throw new IllegalArgumentException("Loại sách phải là sách vật lý hoặc sách số");
         }
 
         BorrowRequest request = new BorrowRequest();
@@ -98,7 +98,7 @@ public class BorrowRequest {
     public void approve(Loan approvedLoan, String actorId) {
         ensurePending();
         if (approvedLoan == null) {
-            throw new IllegalArgumentException("Approved loan is required");
+            throw new IllegalArgumentException("Thiếu thông tin phiếu mượn đã duyệt");
         }
         status = BorrowRequestStatus.APPROVED;
         loan = approvedLoan;
@@ -109,7 +109,7 @@ public class BorrowRequest {
     public void reject(String reason, String actorId) {
         ensurePending();
         if (reason == null || reason.isBlank()) {
-            throw new IllegalArgumentException("Rejection reason is required");
+            throw new IllegalArgumentException("Vui lòng nhập lý do từ chối");
         }
         status = BorrowRequestStatus.REJECTED;
         rejectionReason = reason.trim();
@@ -126,7 +126,7 @@ public class BorrowRequest {
 
     private void ensurePending() {
         if (status != BorrowRequestStatus.PENDING) {
-            throw new IllegalStateException("Only a pending borrow request can be processed");
+            throw new IllegalStateException("Chỉ có thể xử lý yêu cầu đang chờ duyệt");
         }
     }
 
